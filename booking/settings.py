@@ -139,11 +139,10 @@ REST_AUTH_REGISTER_SERIALIZERS = {
 
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
-ACCOUNT_EMAIL_REQUIRED = True
-ACCOUNT_EMAIL_VERIFICATION = "none"
-ACCOUNT_AUTHENTICATION_METHOD = "email"   # ← correct flag
+ACCOUNT_LOGIN_METHODS = {"email"}           # was ACCOUNT_AUTHENTICATION_METHOD
+ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]  # replaces EMAIL_REQUIRED/USERNAME_REQUIRED
 ACCOUNT_USERNAME_REQUIRED = False
-ACCOUNT_USER_MODEL_USERNAME_FIELD = None  # we auth by email
+ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 
 # ── CORS / CSRF ───────────────────────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = [o.strip() for o in env(
