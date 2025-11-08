@@ -6,3 +6,6 @@ djangorestframework
 drf-spectacular
 gunicorn
 whitenoise
+django-environ
+djangorestframework-simplejwt
+requests
