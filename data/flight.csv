@@ -1,0 +1,21 @@
+flight_id,flight_number,departure_airport,arrival_airport,departure_time,arrival_time,status,aircraft_type,gate
+1,7001,London St Pancras,Paris Gare du Nord,8/15/2025 7:00,8/15/2025 9:17,Scheduled,Eurostar e320,5
+2,7002,Paris Gare de Lyon,Lyon Part-Dieu,8/15/2025 8:00,8/15/2025 9:58,Scheduled,TGV Duplex,A
+3,7003,Paris Gare du Nord,Brussels Midi,8/15/2025 9:00,8/15/2025 10:22,Scheduled,Eurostar e320,7
+4,7004,Brussels Midi,Amsterdam Centraal,8/15/2025 10:00,8/15/2025 11:53,Scheduled,Eurostar e320,13
+5,7005,Amsterdam Centraal,Berlin Hbf,8/15/2025 11:00,8/15/2025 17:20,Scheduled,ICE 3,8
+6,7006,Berlin Hbf,Munich Hbf,8/15/2025 12:00,8/15/2025 15:59,Scheduled,ICE 4,12
+7,7007,Munich Hbf,Vienna Hbf,8/15/2025 13:00,8/15/2025 17:05,Scheduled,Railjet,5
+8,7008,Vienna Hbf,Budapest Keleti,8/15/2025 14:00,8/15/2025 16:37,Scheduled,Railjet,4
+9,7009,Zurich HB,Milan Centrale,8/15/2025 15:00,8/15/2025 18:17,Scheduled,ETR 610 (Giruno),9
+10,7010,Milan Centrale,Rome Termini,8/15/2025 16:00,8/15/2025 19:10,Scheduled,ETR 500,14
+11,7011,Rome Termini,Napoli Centrale,8/15/2025 17:00,8/15/2025 18:10,Scheduled,ETR 500,6
+12,7012,Madrid Puerta de Atocha,Barcelona Sants,8/15/2025 18:00,8/15/2025 20:45,Scheduled,AVE S-103,4
+13,7013,Barcelona Sants,Valencia Joaquín Sorolla,8/15/2025 19:00,8/15/2025 21:50,Scheduled,AVE S-112,10
+14,7014,Copenhagen H,Stockholm Central,8/15/2025 20:00,8/16/2025 1:20,Scheduled,X2000,3
+15,7015,Oslo S,Bergen,8/15/2025 21:00,8/16/2025 3:45,Scheduled,Class 73,2
+16,7016,Prague hl.n.,Vienna Hbf,8/15/2025 22:00,8/16/2025 2:05,Scheduled,Railjet,1
+17,7017,Paris Montparnasse,Bordeaux St-Jean,8/15/2025 23:00,8/16/2025 1:10,Scheduled,TGV Duplex,V
+18,7018,Hamburg Hbf,Copenhagen H,8/16/2025 0:00,8/16/2025 4:40,Scheduled,IC,5
+19,7019,Berlin Hbf,Warszawa Centralna,8/16/2025 1:00,8/16/2025 6:25,Scheduled,EC,9
+20,7020,Zurich HB,Geneva,8/16/2025 2:00,8/16/2025 4:44,Scheduled,IC2000,2

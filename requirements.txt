@@ -1,0 +1,8 @@
+Django
+dj-rest-auth
+django-allauth
+django-cors-headers
+djangorestframework
+drf-spectacular
+gunicorn
+whitenoise

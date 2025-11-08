@@ -1,0 +1,76 @@
+# ----- Count source code in the frontend -----
+frontend/src/** linguist-vendored=false
+
+# Explicit language hints (optional but helps)
+*.js   linguist-language=JavaScript
+*.jsx  linguist-language=JavaScript
+*.css  linguist-language=CSS
+*.html linguist-language=HTML
+*.sql  linguist-language=SQL
+
+# Don't let docs/media skew the stats
+docs/**                 linguist-documentation
+*.png                   linguist-documentation
+*.jpg                   linguist-documentation
+*.jpeg                  linguist-documentation
+*.gif                   linguist-documentation
+*.mp4                   linguist-documentation
+
+# Treat generated code as generated (excluded from stats)
+frontend/build/**       linguist-generated
+core/migrations/**      linguist-generated
+
+# (Optional) If you have a /vendor or /node_modules checked in, mark them vendored
+node_modules/**         linguist-vendored
+vendor/**               linguist-vendored
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
