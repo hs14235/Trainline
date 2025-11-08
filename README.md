@@ -62,6 +62,7 @@ Backend
 4) python manage.py migrate
 5) python manage.py runserver
 
+
 Frontend
 1) cd frontend
 2) cp .env.example .env
