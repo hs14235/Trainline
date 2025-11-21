@@ -1,20 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate }       from 'react-router-dom';
-import api                    from '../api';
+import { useNavigate } from 'react-router-dom';
+import api from '../api';
 
 export default function Register() {
-  const [email,     setEmail]     = useState('');
+  const [email, setEmail] = useState('');
   const [password1, setPassword1] = useState('');
   const [password2, setPassword2] = useState('');
-  const [error,     setError]     = useState(null);
-  const navigate                 = useNavigate();
+  const [error, setError] = useState(null);
+  const navigate = useNavigate();
 
-useEffect(() => {
-  document.body.classList.add('bg-register');
-  return () => document.body.classList.remove('bg-register');
-}, []);
+  useEffect(() => {
+    document.body.classList.add('bg-register');
+    return () => document.body.classList.remove('bg-register');
+  }, []);
 
-  const handleSubmit = async e => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
 
@@ -24,44 +24,43 @@ useEffect(() => {
     }
 
     try {
-      await api.post('auth/registration/', {
+      // (optional) prime CSRF if your api.js uses withCredentials
+      await api.get('/dj-rest-auth/login/');
+
+      await api.post('/dj-rest-auth/registration/', {
         email,
         password1,
         password2,
       });
+
       navigate('/login');
     } catch (err) {
       const data = err.response?.data;
-      if (data && typeof data === 'object') {
-        const messages = Object.entries(data)
-          .map(([field, msgs]) =>
-            Array.isArray(msgs) ? `${field}: ${msgs.join(', ')}` : `${field}: ${msgs}`
-          )
-          .join('\n');
-        setError(messages);
-      } else {
-        setError(err.message);
-      }
+      const msg = data
+        ? Object.entries(data)
+            .map(([field, msgs]) =>
+              Array.isArray(msgs) ? `${field}: ${msgs.join(', ')}` : `${field}: ${msgs}`
+            )
+            .join('\n')
+        : err.message;
+      setError(msg);
     }
   };
 
- return (
+  return (
     <form noValidate onSubmit={handleSubmit} className="signup-container">
       <h2>Register</h2>
       {error && <pre style={{ color:'crimson', whiteSpace:'pre-wrap' }}>{error}</pre>}
 
-      <label>
-        Email
+      <label>Email
         <input type="email" value={email} required onChange={e => setEmail(e.target.value)} />
       </label>
 
-      <label>
-        Password
+      <label>Password
         <input type="password" value={password1} required onChange={e => setPassword1(e.target.value)} />
       </label>
 
-      <label>
-        Confirm Password
+      <label>Confirm Password
         <input type="password" value={password2} required onChange={e => setPassword2(e.target.value)} />
       </label>
 
