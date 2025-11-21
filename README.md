@@ -54,16 +54,18 @@ This project was built independently for a **Database Systems class** to demonst
 
 ---
 
-## Local Setup & Installation
-Backend
-1) python -m venv .venv && source .venv/bin/activate
-2) pip install -r requirements.txt
-3) cp .env.example .env
-4) python manage.py migrate
-5) python manage.py runserver
+## Local Setup & Installation [POWERSHELL]
+Backend 
+1) cd $HOME\Desktop\Trainline
+   [ACTIVATE VIRTUAL ENVIRONMENT]
+2) .\.venv\Scripts\Activate.ps1
+   [IF YOU GET ERROR] 
+3) Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\.venv\Scripts\Activate.ps1
+4) python manage.py runserver
 
 
-Frontend
+Frontend 
 1) cd frontend
 2) cp .env.example .env
 3) npm install
