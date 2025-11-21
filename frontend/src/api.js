@@ -1,54 +1,46 @@
+// src/api.js
 import axios from "axios";
 
+function getCookie(name) {
+  const value = document.cookie
+    .split("; ")
+    .find(row => row.startsWith(name + "="));
+  return value ? decodeURIComponent(value.split("=")[1]) : null;
+}
+
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_BASE || "http://127.0.0.1:8000/api/",
+  baseURL: process.env.REACT_APP_API_BASE || "http://127.0.0.1:8000",
   timeout: 15000,
-});
+ });
 
 api.interceptors.request.use((config) => {
+  // Auth token (from dj-rest-auth login)
   const token = localStorage.getItem("token");
   if (token) {
     config.headers.Authorization = `Token ${token}`;
   } else {
     delete config.headers.Authorization;
   }
+
+  // CSRF token (for POST/PUT/PATCH/DELETE)
+  const csrftoken = getCookie("csrftoken");
+  if (csrftoken) {
+    config.headers["X-CSRFToken"] = csrftoken;
+  }
+
   return config;
 });
 
-api.interceptors.response.use(
-  (res) => res,
-  (err) => {
-    if (err?.response?.status === 401) {
-    }
-    return Promise.reject(err);
-  }
-);
+export default api;
 
+// optional helper used elsewhere
 export async function getWithFallback(paths, config) {
   let lastError;
-  for (const path of paths) {
-    try {
-      return await api.get(path, config);
-    } catch (e) {
-      lastError = e;
-      const status = e?.response?.status;
-      if (status && status >= 400 && status < 500 && status !== 404) break;
+  for (const p of paths) {
+    try { return await api.get(p, config); } catch (e) {
+      lastError = e; const s = e?.response?.status;
+      if (s && s >= 400 && s < 500 && s !== 404) break;
     }
   }
   throw lastError;
 }
-
-export function toTrainTrip(rec) {
-  if (!rec) return null;
-  return {
-    id: rec.trip_id ?? rec.flight_id,
-    serviceNumber: rec.service_number ?? rec.flight_number,
-    from: rec.origin_station ?? rec.departure_airport,
-    to: rec.destination_station ?? rec.arrival_airport,
-    departsAt: rec.departure_time ?? null,
-    arrivesAt: rec.arrival_time ?? null,
-    platform: rec.platform ?? rec.gate ?? null,
-  };
-}
-
-export default api;

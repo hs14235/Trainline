@@ -132,30 +132,26 @@ SPECTACULAR_SETTINGS = {
     "VERSION": env("SPECTACULAR_VERSION", default="1.0.0"),
 }
 
-# ── dj-rest-auth / allauth ────────────────────────────────────────────────────
-REST_AUTH_REGISTER_SERIALIZERS = {
-    "REGISTER_SERIALIZER": "core.serializers.CustomRegisterSerializer",
-}
 
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
-ACCOUNT_EMAIL_REQUIRED = True
-ACCOUNT_EMAIL_VERIFICATION = "none"
-ACCOUNT_AUTHENTICATION_METHOD = "email"   # ← correct flag
+ACCOUNT_LOGIN_METHODS = {"email"}           # was ACCOUNT_AUTHENTICATION_METHOD
+ACCOUNT_SIGNUP_FIELDS = ["email", "password1*", "password2*"]  # replaces EMAIL_REQUIRED/USERNAME_REQUIRED
 ACCOUNT_USERNAME_REQUIRED = False
-ACCOUNT_USER_MODEL_USERNAME_FIELD = None  # we auth by email
+ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 
 # ── CORS / CSRF ───────────────────────────────────────────────────────────────
-CORS_ALLOWED_ORIGINS = [o.strip() for o in env(
-    "CORS_ALLOWED_ORIGINS",
-    default="http://localhost:3000"
-).split(",")]
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
 CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
+
 
 # ── Basic security (good defaults; prod will set DEBUG=False) ─────────────────
 SECURE_CONTENT_TYPE_NOSNIFF = True
