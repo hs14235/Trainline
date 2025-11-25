@@ -1,6 +1,7 @@
 from rest_framework import serializers
-from django.contrib.auth import get_user_model
+from dj_rest_auth.registration.serializers import RegisterSerializer
 
+from django.contrib.auth import get_user_model
 from .models import (
     TrainTrip,    
     Ticket,
@@ -11,23 +12,33 @@ from .models import (
 
 User = get_user_model()
 
-from dj_rest_auth.registration.serializers import RegisterSerializer
+
 class CustomRegisterSerializer(RegisterSerializer):
+    username = serializers.CharField(required=True)
+
+    def validate(self, data):
+        print("VALIDATED DATA IN REGISTER SERIALIZER:", data)
+        return super().validate(data)
+
     first_name = serializers.CharField(required=False, allow_blank=True)
     last_name  = serializers.CharField(required=False, allow_blank=True)
     passport_number = serializers.CharField(required=False, allow_blank=True)
-    username = serializers.CharField(required=False, allow_blank=True)
     email    = serializers.EmailField(required=True)
 
     def get_cleaned_data(self):
         data = super().get_cleaned_data()
-        data['first_name']      = self.validated_data.get('first_name', '')
-        data['last_name']       = self.validated_data.get('last_name', '')
+        data['username'] = self.validated_data.get('username', '')
+        data['email'] = self.validated_data.get('email', '')
+        data['password1'] = self.validated_data.get('password1', '')
+        data['password2'] = self.validated_data.get('password2', '')
+        data['first_name'] = self.validated_data.get('first_name', '')
+        data['last_name'] = self.validated_data.get('last_name', '')
         data['passport_number'] = self.validated_data.get('passport_number', '')
-        data['membership_level'] = MembershipLevel.objects.get(level_name="Silver")
-        data['membership_points'] = 0
         return data
-
+    
+    class Meta:
+        model = User
+        fields = ('email', 'first_name', 'last_name', 'passport_number', 'password1', 'password2')
 
 class MembershipLevelSerializer(serializers.ModelSerializer):
     class Meta:

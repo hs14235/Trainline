@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../api';
 
 export default function Register() {
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password1, setPassword1] = useState('');
   const [password2, setPassword2] = useState('');
@@ -24,10 +25,9 @@ export default function Register() {
     }
 
     try {
-      // (optional) prime CSRF if your api.js uses withCredentials
-      await api.get('/dj-rest-auth/login/');
 
       await api.post('/dj-rest-auth/registration/', {
+        username,
         email,
         password1,
         password2,
@@ -51,6 +51,10 @@ export default function Register() {
     <form noValidate onSubmit={handleSubmit} className="signup-container">
       <h2>Register</h2>
       {error && <pre style={{ color:'crimson', whiteSpace:'pre-wrap' }}>{error}</pre>}
+
+      <label>Username
+        <input type="text" value={username} required onChange={e => setUsername(e.target.value)} />
+      </label>
 
       <label>Email
         <input type="email" value={email} required onChange={e => setEmail(e.target.value)} />

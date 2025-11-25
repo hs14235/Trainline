@@ -39,9 +39,7 @@ class Passenger(models.Model):
           on_delete=models.CASCADE)
     
     relationship = models.CharField(max_length=10, blank=True, null=True)
-    
-    user = models.OneToOneField('User', models.DO_NOTHING, primary_key=True)
-    
+        
     membership_level = models.ForeignKey(
         MembershipLevel,
         on_delete=models.PROTECT,
@@ -124,11 +122,6 @@ class Payment(models.Model):
         db_table = 'payment'
 
 
-from django.db import models
-from django.contrib.auth.models import (
-    AbstractBaseUser, PermissionsMixin, BaseUserManager
-)
-
 class UserManager(BaseUserManager):
     use_in_migrations = True
 
@@ -148,8 +141,7 @@ class UserManager(BaseUserManager):
 
 
 class User(AbstractBaseUser, PermissionsMixin):
-    user_id          = models.CharField(max_length=10, primary_key=True)
-    passport_number = models.CharField(max_length=20, unique=True)
+    username = models.CharField(max_length=150, unique=True, default='default_user')
     passport_number = models.CharField(
         max_length=20,
         unique=False,        
@@ -173,8 +165,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     last_login   = models.DateTimeField(null=True, blank=True)
     date_joined  = models.DateTimeField(auto_now_add=True)
 
-    USERNAME_FIELD  = 'user_id'
-    REQUIRED_FIELDS = ['email']
+    USERNAME_FIELD  = 'email'
+    REQUIRED_FIELDS = []
 
     objects = UserManager()
 

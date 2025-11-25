@@ -6,9 +6,7 @@ import environ
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ── .env loader ────────────────────────────────────────────────────────────────
-env = environ.Env(
-    DJANGO_DEBUG=(bool, False),
-)
+env = environ.Env()
 environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 
 # ── Core ──────────────────────────────────────────────────────────────────────
@@ -89,8 +87,9 @@ WSGI_APPLICATION = "booking.wsgi.application"
 
 # ── Database (reads DATABASE_URL; falls back to sqlite) ───────────────────────
 DATABASES = {
-    "default": env.db("DATABASE_URL", default=f"sqlite:///{BASE_DIR/'db.sqlite3'}")
+    "default":  env.db('DATABASE_URL')
 }
+
 
 # ── Password validators ───────────────────────────────────────────────────────
 AUTH_PASSWORD_VALIDATORS = [
@@ -132,13 +131,17 @@ SPECTACULAR_SETTINGS = {
     "VERSION": env("SPECTACULAR_VERSION", default="1.0.0"),
 }
 
+ACCOUNT_SIGNUP_FIELDS = ['email', 'username', 'password1', 'password2']
+ACCOUNT_AUTHENTICATION_METHOD = 'username'  # or 'email' or 'username_email'
+ACCOUNT_USERNAME_REQUIRED = True  # or False, depending on the above
+ACCOUNT_EMAIL_REQUIRED = True
 
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+REST_AUTH_REGISTER_SERIALIZERS = {
+    'register': 'core.serializers.CustomRegisterSerializer',
+}
 
-ACCOUNT_LOGIN_METHODS = {"email"}           # was ACCOUNT_AUTHENTICATION_METHOD
-ACCOUNT_SIGNUP_FIELDS = ["email", "password1*", "password2*"]  # replaces EMAIL_REQUIRED/USERNAME_REQUIRED
-ACCOUNT_USERNAME_REQUIRED = False
-ACCOUNT_USER_MODEL_USERNAME_FIELD = None
+
+
 
 # ── CORS / CSRF ───────────────────────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = [
