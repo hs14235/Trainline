@@ -174,6 +174,27 @@ class TicketViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    def partial_update(self, request, pk=None):
+        """
+        Handle PATCH updates to a ticket and return the updated ticket
+        plus passenger membership info for immediate frontend refresh.
+        """
+        ticket = self.get_object()
+        serializer = self.get_serializer(ticket, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        # ensure we have the latest DB state
+        ticket.refresh_from_db()
+        passenger = ticket.passenger
+
+        return Response({
+            "ticket": serializer.data,
+            "membership_points": passenger.membership_points,
+            "membership_level": passenger.membership_level.level_name if passenger.membership_level else None
+        }, status=status.HTTP_200_OK)
+
+
     def perform_update(self, serializer):
         """
         When the user toggles any add‑on (priority_boarding, meal, etc.),
@@ -182,6 +203,9 @@ class TicketViewSet(viewsets.ModelViewSet):
         ticket = serializer.instance
         old = Ticket.objects.get(pk=ticket.pk)
         serializer.save()  # commit the changes first
+
+        # ensure serializer.instance is up to date
+        serializer.instance.refresh_from_db()
 
         now_full = all([
             serializer.instance.priority_boarding,
@@ -196,12 +220,15 @@ class TicketViewSet(viewsets.ModelViewSet):
             old.taxi,
         ])
 
+        # logging to help debug in container logs
+        print(f"[ticket-update] ticket={ticket.pk} now_full={now_full} was_full={was_full}")
+
         if now_full and not was_full:
             passenger = ticket.passenger
             passenger.membership_points = (passenger.membership_points or 0) + 1
 
             pts = passenger.membership_points
-            # bump tier based on total full tickets
+            # bump tier based on total points
             if pts >= 7:
                 name, defaults = "Platinum", {"perks_description": "Lounge access, extra baggage"}
             elif pts >= 4:
@@ -218,6 +245,8 @@ class TicketViewSet(viewsets.ModelViewSet):
             )
             passenger.membership_level = lvl
             passenger.save()
+
+            print(f"[ticket-update] awarded +1 point to passenger={passenger.pk}; total_points={passenger.membership_points}")
 
 class UserDetailView(generics.RetrieveAPIView):
     """

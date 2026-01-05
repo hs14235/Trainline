@@ -50,15 +50,23 @@ export default function Home() {
 
   const addFlag = async (ticketId, field) => {
     try {
-      await api.patch(`tickets/${ticketId}/`, { [field]: true });
+      const res = await api.patch(`/api/tickets/${ticketId}/`, { [field]: true });
 
-      const [uRes, tRes] = await Promise.all([
-        api.get('/api/me/'),
-        api.get('/api/tickets/')
-      ]);
+      // If backend returns the updated ticket + membership info, use it
+      if (res.data) {
+        if (res.data.membership_points !== undefined) {
+          setUser(u => ({ ...u, membership_points: res.data.membership_points, membership_level: res.data.membership_level }));
+        }
+        if (res.data.ticket) {
+          setTickets(prev => prev.map(t => (t.ticket_id === res.data.ticket.ticket_id ? res.data.ticket : t)));
+          return;
+        }
+      }
 
-      setUser(uRes.data);
-      setTickets(tRes.data);
+      // fallback: refresh whole state
+      const [uRes, tRes] = await Promise.allSettled([api.get('/api/me/'), api.get('/api/tickets/')]);
+      if (uRes.status === 'fulfilled') setUser(uRes.value.data);
+      if (tRes.status === 'fulfilled') setTickets(tRes.value.data);
     } catch (e) {
       console.error(e);
     }
