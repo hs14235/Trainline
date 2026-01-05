@@ -33,9 +33,26 @@ class TrainTripViewSet(viewsets.ReadOnlyModelViewSet):
              (60 if accom else 0) +
              (40 if taxi else 0)
         )
+            # Ensure Bronze level exists
+        bronze_level, _ = MembershipLevel.objects.get_or_create(
+            level_name="Bronze",
+            defaults={"min_points_required": 0, "perks_description": "Welcome aboard"},
+        )
+
+        # Ensure passenger exists for demo: auto-create a minimal profile if missing
+        passenger, created = Passenger.objects.get_or_create(
+            user=request.user,
+            defaults={
+                'full_name': getattr(request.user, 'username', request.user.email),
+                'passport_number': f"auto-{request.user.pk}",
+                'membership_level': bronze_level,
+            }
+        )
+
+
 
         ticket = Ticket.objects.create(
-            passenger=Passenger.objects.get(user=request.user),
+            passenger=passenger,
             train_trip=trip,
             priority_boarding=pb,
             meal=meal,
@@ -137,7 +154,6 @@ class TicketViewSet(viewsets.ModelViewSet):
 
             passenger.save()
 
-            user = request.user
             user.membership_points = passenger.membership_points
             user.membership_level = passenger.membership_level
             user.save()
@@ -221,17 +237,16 @@ class SeatListCreateView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, flight_id):
-        # TODO: return actual available seats
-        all_seats  = ["1A","1B","1C","1D","2A","2B","2C","2D"]
-        taken      = Ticket.objects.filter(flight__flight_id=flight_id).values_list("seat_num", flat=True)
+        all_seats = ["1A", "1B", "1C", "1D", "2A", "2B", "2C", "2D"]
+        taken = Ticket.objects.filter(train_trip__train_trip_id=flight_id).values_list("seat_number", flat=True)
         free_seats = [s for s in all_seats if s not in taken]
         return Response(free_seats)
 
     def post(self, request, flight_id):
-        seat      = request.data.get("seat_num")
+        seat = request.data.get("seat_num") or request.data.get("seat_number")
         ticket_id = request.data.get("ticket_id")
-        ticket    = Ticket.objects.get(pk=ticket_id, passenger__user=request.user)
-        ticket.seat_num = seat
+        ticket = Ticket.objects.get(pk=ticket_id, passenger__user=request.user)
+        ticket.seat_number = seat
         ticket.save()
         return Response({"status": "seat assigned"})
 
@@ -246,6 +261,6 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=True, methods=['post'])
     def mark_read(self, request, pk=None):
         n = self.get_object()
-        n.read_status = 'read'
+        n.is_read = True
         n.save()
         return Response({'status': 'ok'})

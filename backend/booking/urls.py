@@ -21,8 +21,7 @@ urlpatterns = [
 
     # API routes
     path("api/", include(router.urls)),
-    path("api/seats/", SeatListCreateView.as_view(), name="seat-list-create"),
-    path("api/me/", UserDetailView.as_view(), name="me"),
+    path("api/seats/<str:flight_id>/", SeatListCreateView.as_view(), name="seat-list-create"),
 
     # Auth
     path("dj-rest-auth/", include("dj_rest_auth.urls")),

@@ -1,0 +1,4 @@
+train_trip_id,service_number,origin_station,destination_station,departure_time,arrival_time,platform,consist_model,status
+T100,100,Central,North,2026-01-08T09:00:00Z,2026-01-08T10:30:00Z,1,EMU,on_time
+T101,101,East,West,2026-01-08T11:00:00Z,2026-01-08T12:15:00Z,2,DMU,delayed
+T102,102,South,Central,2026-01-09T08:15:00Z,2026-01-09T09:45:00Z,3,EMU,on_time
