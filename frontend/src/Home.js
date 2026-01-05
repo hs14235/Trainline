@@ -53,7 +53,7 @@ export default function Home() {
       await api.patch(`tickets/${ticketId}/`, { [field]: true });
 
       const [uRes, tRes] = await Promise.all([
-        api.get("user/"),
+        api.get("api/me/"),
         api.get("tickets/")
       ]);
 
@@ -96,8 +96,8 @@ export default function Home() {
           </thead>
           <tbody>
              {tickets.map(t => {
-              const trip = t.train_trip || t.flight || {};
-              const serviceNo = trip.service_number ?? trip.flight_number;
+              const trip = t.train_trip || {};
+              const serviceNo = trip.service_number;
 
               return (
                 <tr key={t.ticket_id}>

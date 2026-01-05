@@ -3,7 +3,7 @@ import { useParams, useNavigate }       from "react-router-dom";
 import api                              from "../api";
 
 export default function BookFlight() {
-  const { flightId } = useParams();
+  const { tripId } = useParams();
   const navigate    = useNavigate();
 
   const [loading, setLoading]           = useState(true);
@@ -27,13 +27,13 @@ export default function BookFlight() {
   }, []);
 
   useEffect(() => {
-    api.get(`flights/${flightId}/`)
+    api.get(`trips/${tripId}/`)
       .then(res => {
         setBaseFare(res.data.fare ?? 100);
       })
       .catch(() => setError("Couldn’t load flight info"))
       .finally(() => setLoading(false));
-  }, [flightId]);
+  }, [tripId]);
 
   const totalFare =
     baseFare +
@@ -50,10 +50,7 @@ export default function BookFlight() {
         accommodation:     accommodation,
         taxi:              taxi,
       };
-      const res = await api.post(
-        `flights/${flightId}/book/`,
-        payload
-      );
+      const res = await api.post(`trips/${tripId}/book/`, payload);
       navigate(`/payment/${res.data.ticket_id}`);
     } catch (err) {
       console.error(err);
@@ -67,7 +64,7 @@ export default function BookFlight() {
 
   return (
     <div style={{ padding: "1rem" }}>
-      <h2>Book a train line #{flightId}</h2>
+      <h2>Book a train line #{tripId}</h2>
       <p>Base fare: <strong>${baseFare.toFixed(2)}</strong></p>
 
       <label style={{ display: "block", margin: "0.5rem 0" }}>

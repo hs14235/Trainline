@@ -5,7 +5,7 @@ import { Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Home from './Home';
-import Flights from './Flights';
+import Trips from './train-trips';
 import BookFlight from './pages/BookFlight';
 import PaymentPage from './pages/PaymentPage';
 import SeatSelect from './pages/SeatSelect';
@@ -42,7 +42,7 @@ export default function App() {
               </Link>
 
               <Link
-                to="/flights"
+                to="/trips"
                 className="nav-link"
                 data-tip="Browse and book"
                 data-tooltip-id="main-tip"
@@ -89,9 +89,8 @@ export default function App() {
           <Route path="/login" element={token ? <Navigate to="/" replace /> : <Login />} />
           <Route path="/register" element={token ? <Navigate to="/" replace /> : <Register />} />
 
-          <Route path="/trips"   element={token ? <Flights /> : <Navigate to="/login" replace />} />
-          <Route path="/flights" element={token ? <Flights /> : <Navigate to="/login" replace />} />
-
+          <Route path="/trips"   element={token ? <Trips /> : <Navigate to="/login" replace />} />
+          <Route path="/flights" element={token ? <Trips /> : <Navigate to="/login" replace />} />
           <Route path="/book/:flightId" element={token ? <BookFlight /> : <Navigate to="/login" replace />} />
           <Route path="/select-seat/:ticketId" element={token ? <SeatSelect /> : <Navigate to="/login" replace />} />
           <Route path="/payment/:ticketId" element={token ? <PaymentPage /> : <Navigate to="/login" replace />} />
