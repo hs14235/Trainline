@@ -39,11 +39,11 @@ export default function Home() {
 
   const points = user.membership_points || 0;
   let level = "Bronze";
-  if (points >= 7) {
+  if (points >= 10) {
     level = "Platinum";
-  } else if (points >= 4) {
+  } else if (points >= 6) {
     level = "Gold";
-  } else if (points >= 2) {
+  } else if (points >= 3) {
     level = "Silver";
   }
   
@@ -64,7 +64,7 @@ export default function Home() {
       }
 
       // fallback: refresh whole state
-      const [uRes, tRes] = await Promise.allSettled([api.get('/api/me/'), api.get('/api/tickets/')]);
+      const [uRes, tRes] = await Promise.allSettled([api.get('/dj-rest-auth/user/'), api.get('/api/tickets/')]);
       if (uRes.status === 'fulfilled') setUser(uRes.value.data);
       if (tRes.status === 'fulfilled') setTickets(tRes.value.data);
     } catch (e) {
@@ -119,7 +119,7 @@ export default function Home() {
                 </td>
                 <td>
                   {t.paid
-                    ? "✅"
+                      ? "✘"
                     : <button onClick={() => navigate(`/payment/${t.ticket_id}`)}
                      data-tooltip-id="main-tip"
                      data-tooltip-content="Pay">
@@ -127,10 +127,10 @@ export default function Home() {
                   }
                 </td>
                 <td>{t.payment_method || "—"}</td>
-                <td>{t.priority_boarding ? "✅" : "No"}</td>
-                <td>{t.meal              ? "✅" : "No"}</td>
-                <td>{t.accommodation     ? "✅" : "No"}</td>
-                <td>{t.taxi             ? "✅" : "No"}</td>
+                  <td>{t.priority_boarding ? "✘" : "☐"}</td>
+                  <td>{t.meal ? "✘" : "☐"}</td>
+                  <td>{t.accommodation ? "✘" : "☐"}</td>
+                  <td>{t.taxi ? "✘" : "☐"}</td>
                 <td>{new Date(t.booked_at).toLocaleDateString()}</td>
                 <td>
                   {!t.priority_boarding &&

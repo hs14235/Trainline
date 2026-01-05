@@ -32,7 +32,7 @@ export default function SeatSelect() {
 
   const handleSelect = async seat => {
     try {
-      await api.patch(`tickets/${ticketId}/`, { seat_num: seat });
+      await api.patch(`/api/tickets/${ticketId}/`, { seat_num: seat });
       navigate('/')
     } catch (err) {
       console.error(err)

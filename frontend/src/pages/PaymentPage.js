@@ -17,7 +17,7 @@ export default function PaymentPage() {
 
 
   useEffect(() => {
-    api.get(`tickets/${ticketId}/`)
+    api.get(`/api/tickets/${ticketId}/`)
       .then(res => setTicket(res.data))
       .catch(() => setError('Unable to load ticket'))
   }, [ticketId])

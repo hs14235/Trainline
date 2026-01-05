@@ -8,7 +8,7 @@ from .models import TrainTrip, Ticket, Passenger, MembershipLevel
 from .serializers import TrainTripSerializer, TicketSerializer, UserSerializer
 from .models import Notification
 from .serializers import NotificationSerializer
-
+from .membership import update_membership_level
 
 
 class TrainTripViewSet(viewsets.ReadOnlyModelViewSet):
@@ -78,13 +78,21 @@ class TrainTripViewSet(viewsets.ReadOnlyModelViewSet):
             defaults={'membership_level': bronze_level  }
                 )
             
-       
-        points_earned = (10 if pb else 0) + (5 if meal else 0)
-        passenger.membership_points = passenger.membership_points + points_earned
+       # award a single point if the ticket is created fully-loaded
+        points_earned = 1 if (pb and meal and accom and taxi) else 0
+        if points_earned:
+            passenger.membership_points = (passenger.membership_points or 0) + points_earned
+            update_membership_level(passenger)
         passenger.save()
 
         return Response(
-            {'ticket_id': ticket.pk, 'amount': amount, 'points_earned': points_earned},
+            {
+                'ticket_id': ticket.pk,
+                'amount': amount,
+                'points_earned': points_earned,
+                "membership_points": passenger.membership_points,
+                "membership_level": passenger.membership_level.level_name if passenger.membership_level else None,
+            },
             status=status.HTTP_201_CREATED
         )
 
@@ -103,9 +111,9 @@ class TicketViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def pay(self, request, pk=None):
+        """Mark ticket as paid and return current membership info (points-driven)."""
         try:
             ticket = self.get_object()
-            user = request.user
             pm = request.data.get("payment_method")
             if not pm:
                 return Response({"error": "payment_method required"}, status=400)
@@ -115,64 +123,21 @@ class TicketViewSet(viewsets.ModelViewSet):
             ticket.save()
 
             passenger = ticket.passenger
-            full_count = Ticket.objects.filter(
-                passenger=passenger,
-                paid=True,
-                priority_boarding=True,
-                meal=True,
-                accommodation=True,
-                taxi=True,
-            ).count()
-
-
-
-            if full_count >= 9:
-                level_name, defaults = "Platinum", {
-                    "min_points_required": 0,
-                    "perks_description": "Lounge access, extra baggage",
-                }
-            elif full_count >= 5:
-                level_name, defaults = "Gold", {
-                    "min_points_required": 0,
-                    "perks_description": "Free checked bag, priority boarding",
-                }
-            elif full_count >= 2:
-                level_name, defaults = "Silver", {
-                    "min_points_required": 0,
-                    "perks_description": "Standard boarding",
-                }
-            else:
-                level_name = None
-
-            if level_name:
-                lvl, _ = MembershipLevel.objects.get_or_create(
-                    level_name=level_name,
-                    defaults=defaults
-                )
-                passenger.membership_level = lvl
-            else:
-                passenger.membership_level = None
-
-            passenger.save()
-
-
+            # Ensure the passenger's level matches their points (safe no-op)
+            update_membership_level(passenger)
 
             return Response({
                 "status": "paid",
-                "full_tickets": full_count,
                 "membership_points": passenger.membership_points,
-                "membership_level": passenger.membership_level.level_name
-                                     if passenger.membership_level else None
+                "membership_level": passenger.membership_level.level_name if passenger.membership_level else None
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
             import traceback
-            print("error in pay() method bruh", e)
+            print("error in pay() method:", e)
             print(traceback.format_exc())
-            return Response(
-                {"error": "Internal error, see server console"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"error": "Internal error, see server console"},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def partial_update(self, request, pk=None):
         """
@@ -226,25 +191,8 @@ class TicketViewSet(viewsets.ModelViewSet):
         if now_full and not was_full:
             passenger = ticket.passenger
             passenger.membership_points = (passenger.membership_points or 0) + 1
-
-            pts = passenger.membership_points
-            # bump tier based on total points
-            if pts >= 7:
-                name, defaults = "Platinum", {"perks_description": "Lounge access, extra baggage"}
-            elif pts >= 4:
-                name, defaults = "Gold", {"perks_description": "Free checked bag, priority boarding"}
-            elif pts >= 2:
-                name, defaults = "Silver", {"perks_description": "Standard boarding"}
-            else:
-                name = "Bronze"
-                defaults = {"min_points_required": 0, "perks_description": "Welcome aboard"}
-
-            lvl, _ = MembershipLevel.objects.get_or_create(
-                level_name=name,
-                defaults=defaults
-            )
-            passenger.membership_level = lvl
-            passenger.save()
+            update_membership_level(passenger)
+            
 
             print(f"[ticket-update] awarded +1 point to passenger={passenger.pk}; total_points={passenger.membership_points}")
 

@@ -91,7 +91,7 @@ export default function App() {
 
           <Route path="/trips"   element={token ? <Trips /> : <Navigate to="/login" replace />} />
           <Route path="/flights" element={token ? <Trips /> : <Navigate to="/login" replace />} />
-          <Route path="/book/:flightId" element={token ? <BookFlight /> : <Navigate to="/login" replace />} />
+          <Route path="/book/:tripId" element={token ? <BookFlight /> : <Navigate to="/login" replace />} />
           <Route path="/select-seat/:ticketId" element={token ? <SeatSelect /> : <Navigate to="/login" replace />} />
           <Route path="/payment/:ticketId" element={token ? <PaymentPage /> : <Navigate to="/login" replace />} />
 
