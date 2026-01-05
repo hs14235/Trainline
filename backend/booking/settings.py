@@ -135,14 +135,13 @@ SPECTACULAR_SETTINGS = {
 }
 
 
-ACCOUNT_USERNAME_REQUIRED = True
-ACCOUNT_EMAIL_REQUIRED = True
-ACCOUNT_AUTHENTICATION_METHOD = "username_email"
+# Use the new config keys to avoid deprecation warnings
+ACCOUNT_LOGIN_METHODS = {"username", "email"}
+ACCOUNT_SIGNUP_FIELDS = ["email*", "username*", "password1*", "password2*"]
 ACCOUNT_EMAIL_VERIFICATION = "none"
 
-
 REST_AUTH_REGISTER_SERIALIZERS = {
-    "REGISTER_SERIALIZER": "core.serializers.CustomRegisterSerializer"
+    "REGISTER_SERIALIZER": "core.serializers.SimpleRegisterSerializer"
 }
 
 # ── CORS / CSRF ───────────────────────────────────────────────────────────────
