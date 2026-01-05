@@ -4,12 +4,12 @@ import api from './api';
 export default function Profile() {
   const [user, setUser] = useState({});
   useEffect(()=>{
-    api.get('user/').then(r=>setUser(r.data));
+    api.get('/api/user/').then(r=>setUser(r.data));
   },[]);
 
   const handleSave = e => {
     e.preventDefault();
-    api.patch('user/update/', user)
+    api.patch('/api/user/update/', user)
        .then(()=>alert('Profile updated!'));
   };
 

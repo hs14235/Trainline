@@ -7,7 +7,7 @@ export default function Tickets() {
   const [error, setError]     = useState(null);
 
   useEffect(() => {
-    api.get(`ticket/${ticketId}/`)
+    api.get(`/api/tickets/${ticketId}/`)
       .then(res => setTickets(res.data))
       .catch(err => setError(err))
       .finally(() => setLoading(false));

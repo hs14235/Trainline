@@ -20,7 +20,7 @@ export default function Trips() {
     const load = async () => {
       setLoading(true);
       try {
-        const r = await api.get('trips/');
+        const r = await api.get('/api/trips/');
         if (!cancelled) setTrips(r.data);
       } catch (err) {
         if (!cancelled) setError(err);

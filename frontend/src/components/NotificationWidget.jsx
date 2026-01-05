@@ -5,7 +5,7 @@ export default function NotificationWidget() {
   const [notes, setNotes] = useState([]);
 
   useEffect(() => {
-    api.get("api/notifications/")
+    api.get('api/notifications/')
         .then(res => setNotes(res.data))
         .catch(console.error);
   }, []);

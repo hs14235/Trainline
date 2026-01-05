@@ -31,7 +31,7 @@ export default function PaymentPage() {
   const handlePay = async e => {
     e.preventDefault()
     try {
-      await api.post(`tickets/${ticketId}/pay/`, { payment_method: method })
+      await api.post(`/api/tickets/${ticketId}/pay/`, { payment_method: method })
       window.location.href = '/'
     } catch (err) {
       setError(

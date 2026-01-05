@@ -53,8 +53,8 @@ export default function Home() {
       await api.patch(`tickets/${ticketId}/`, { [field]: true });
 
       const [uRes, tRes] = await Promise.all([
-        api.get("api/me/"),
-        api.get("tickets/")
+        api.get('/api/me/'),
+        api.get('/api/tickets/')
       ]);
 
       setUser(uRes.data);
