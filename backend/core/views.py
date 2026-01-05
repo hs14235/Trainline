@@ -105,6 +105,7 @@ class TicketViewSet(viewsets.ModelViewSet):
     def pay(self, request, pk=None):
         try:
             ticket = self.get_object()
+            user = request.user
             pm = request.data.get("payment_method")
             if not pm:
                 return Response({"error": "payment_method required"}, status=400)
@@ -123,7 +124,7 @@ class TicketViewSet(viewsets.ModelViewSet):
                 taxi=True,
             ).count()
 
-            passenger.membership_points = full_count
+
 
             if full_count >= 9:
                 level_name, defaults = "Platinum", {
@@ -154,9 +155,7 @@ class TicketViewSet(viewsets.ModelViewSet):
 
             passenger.save()
 
-            user.membership_points = passenger.membership_points
-            user.membership_level = passenger.membership_level
-            user.save()
+
 
             return Response({
                 "status": "paid",
@@ -167,7 +166,9 @@ class TicketViewSet(viewsets.ModelViewSet):
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
-            print("🔥 error in pay():", e)
+            import traceback
+            print("error in pay() method bruh", e)
+            print(traceback.format_exc())
             return Response(
                 {"error": "Internal error, see server console"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
