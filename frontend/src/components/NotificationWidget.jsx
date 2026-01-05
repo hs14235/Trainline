@@ -16,7 +16,7 @@ export default function NotificationWidget() {
       bottom: 20,
       left: 20,
       width: 100,
-      height: 400,
+      height: 400,  
       maxHeight: 400,
       overflowY: "auto",
       background: "transparent",

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import api from "./api";
-import ChatWidget from "./components/ChatWidget";
 
 export default function Home() {
   const [user, setUser] = useState(null);
@@ -21,8 +20,8 @@ export default function Home() {
     if (!token) return navigate("/login");
 
     Promise.all([
-      api.get("user/"),
-      api.get("tickets/"),
+      api.get("/dj-rest-auth/user/"),
+      api.get("/api/tickets/"),
     ])
       .then(([uRes, tRes]) => {
         setUser(uRes.data);
@@ -38,7 +37,7 @@ export default function Home() {
   if (loading) return <p>Loading…</p>;
   if (error)   return <p style={{ color: "crimson" }}>{error}</p>;
 
-  const points = user.membership_points |0;
+  const points = user.membership_points || 0;
   let level = "Bronze";
   if (points >= 7) {
     level = "Platinum";

@@ -1,6 +1,11 @@
+# Node dependencies (never copy)
 node_modules
+
+# React build output (generated inside Docker)
 build
-.dockerignore
-Dockerfile
-nginx.conf
+
+# Environment files
 .env
+
+# Docker metadata (optional to exclude)
+.dockerignore

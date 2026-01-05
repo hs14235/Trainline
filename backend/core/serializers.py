@@ -12,33 +12,21 @@ from .models import (
 
 User = get_user_model()
 
+from dj_rest_auth.registration.serializers import RegisterSerializer
+from rest_framework import serializers
 
-class CustomRegisterSerializer(RegisterSerializer):
+class SimpleRegisterSerializer(RegisterSerializer):
     username = serializers.CharField(required=True)
-
-    def validate(self, data):
-        print("VALIDATED DATA IN REGISTER SERIALIZER:", data)
-        return super().validate(data)
-
-    first_name = serializers.CharField(required=False, allow_blank=True)
-    last_name  = serializers.CharField(required=False, allow_blank=True)
-    passport_number = serializers.CharField(required=False, allow_blank=True)
-    email    = serializers.EmailField(required=True)
+    email = serializers.EmailField(required=True)
 
     def get_cleaned_data(self):
-        data = super().get_cleaned_data()
-        data['username'] = self.validated_data.get('username', '')
-        data['email'] = self.validated_data.get('email', '')
-        data['password1'] = self.validated_data.get('password1', '')
-        data['password2'] = self.validated_data.get('password2', '')
-        data['first_name'] = self.validated_data.get('first_name', '')
-        data['last_name'] = self.validated_data.get('last_name', '')
-        data['passport_number'] = self.validated_data.get('passport_number', '')
-        return data
-    
-    class Meta:
-        model = User
-        fields = ('email', 'first_name', 'last_name', 'passport_number', 'password1', 'password2')
+        return {
+            "username": self.validated_data.get("username", ""),
+            "email": self.validated_data.get("email", ""),
+            "password1": self.validated_data.get("password1", ""),
+            "password2": self.validated_data.get("password2", ""),
+        }
+
 
 class MembershipLevelSerializer(serializers.ModelSerializer):
     class Meta:
@@ -53,8 +41,6 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             "user_id",
-            "first_name",
-            "last_name",
             "email",
             "membership_level",
             "membership_points",

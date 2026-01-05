@@ -1,0 +1,21 @@
+train_trip_id,service_number,origin_station,destination_station,departure_time,arrival_time,platform,consist_model,status
+T1001,TS101,Chicago,Seattle,2026-01-07T13:00:00Z,2026-01-07T18:00:00Z,11,Model Y,on_time
+T1002,TS102,Amsterdam,Brussels,2026-01-07T14:00:00Z,2026-01-07T23:15:00Z,5,Model Y,on_time
+T1003,TS103,Denver,Salt Lake City,2026-01-07T08:15:00Z,2026-01-07T12:30:00Z,3,Model Y,on_time
+T1004,TS104,Vienna,Prague,2026-01-07T08:15:00Z,2026-01-07T14:45:00Z,1,Model X,on_time
+T1005,TS105,Oslo,Stockholm,2026-01-07T13:30:00Z,2026-01-07T16:45:00Z,12,Model A,on_time
+T1006,TS106,Houston,New Orleans,2026-01-07T13:30:00Z,2026-01-08T00:15:00Z,8,Model Y,on_time
+T1007,TS107,New York,Boston,2026-01-07T13:30:00Z,2026-01-07T17:15:00Z,5,Model A,cancelled
+T1008,TS108,Miami,Orlando,2026-01-07T14:00:00Z,2026-01-07T19:30:00Z,10,Model Y,cancelled
+T1009,TS109,Warsaw,Krakow,2026-01-07T13:45:00Z,2026-01-07T18:00:00Z,2,Model Z,delayed
+T1010,TS110,Rome,Milan,2026-01-07T06:45:00Z,2026-01-07T12:00:00Z,6,Model Z,on_time
+T1011,TS111,Atlanta,Charlotte,2026-01-07T06:45:00Z,2026-01-07T10:30:00Z,3,Model A,cancelled
+T1012,TS112,Copenhagen,Hamburg,2026-01-07T08:00:00Z,2026-01-07T17:45:00Z,8,Model Z,on_time
+T1013,TS113,Zurich,Geneva,2026-01-07T08:15:00Z,2026-01-07T15:00:00Z,3,Model A,cancelled
+T1014,TS114,Portland,Sacramento,2026-01-07T10:45:00Z,2026-01-07T20:15:00Z,1,Model Z,on_time
+T1015,TS115,London,Paris,2026-01-07T06:45:00Z,2026-01-07T09:15:00Z,7,Model X,delayed
+T1016,TS116,Washington DC,Philadelphia,2026-01-07T15:15:00Z,2026-01-07T21:30:00Z,7,Model A,delayed
+T1017,TS117,Los Angeles,San Francisco,2026-01-07T11:00:00Z,2026-01-07T14:30:00Z,10,Model Z,on_time
+T1018,TS118,Madrid,Barcelona,2026-01-07T15:00:00Z,2026-01-07T17:30:00Z,2,Model Y,on_time
+T1019,TS119,Berlin,Munich,2026-01-07T10:00:00Z,2026-01-07T12:45:00Z,8,Model Y,on_time
+T1020,TS120,Dallas,Austin,2026-01-07T13:00:00Z,2026-01-07T17:45:00Z,3,Model A,on_time

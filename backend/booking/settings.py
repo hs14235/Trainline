@@ -3,6 +3,7 @@ from pathlib import Path
 import os
 import environ
 
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ── .env loader ────────────────────────────────────────────────────────────────
@@ -18,11 +19,11 @@ ALLOWED_HOSTS = [h.strip() for h in env(
     default="127.0.0.1,localhost"
 ).split(",")]
 
-SITE_ID = 1
 AUTH_USER_MODEL = "core.User"
 
 # ── Apps ──────────────────────────────────────────────────────────────────────
 INSTALLED_APPS = [
+    "core",
     "whitenoise.runserver_nostatic",   # serve static in dev without collectstatic
     "django.contrib.admin",
     "django.contrib.auth",
@@ -43,8 +44,10 @@ INSTALLED_APPS = [
     "dj_rest_auth",
     "dj_rest_auth.registration",
 
-    "core",
+   
 ]
+
+SITE_ID = 1
 
 # ── Middleware ────────────────────────────────────────────────────────────────
 MIDDLEWARE = [
@@ -115,7 +118,7 @@ REST_FRAMEWORK = {
     # Keep Token+Session for now (you can switch to JWT later)
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.TokenAuthentication",
-        "rest_framework.authentication.SessionAuthentication",
+        # "rest_framework.authentication.SessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticatedOrReadOnly",
@@ -131,17 +134,16 @@ SPECTACULAR_SETTINGS = {
     "VERSION": env("SPECTACULAR_VERSION", default="1.0.0"),
 }
 
-ACCOUNT_SIGNUP_FIELDS = ['email', 'username', 'password1', 'password2']
-ACCOUNT_AUTHENTICATION_METHOD = 'username'  # or 'email' or 'username_email'
-ACCOUNT_USERNAME_REQUIRED = True  # or False, depending on the above
+
+ACCOUNT_USERNAME_REQUIRED = True
 ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_AUTHENTICATION_METHOD = "username_email"
+ACCOUNT_EMAIL_VERIFICATION = "none"
+
 
 REST_AUTH_REGISTER_SERIALIZERS = {
-    'register': 'core.serializers.CustomRegisterSerializer',
+    "REGISTER_SERIALIZER": "core.serializers.CustomRegisterSerializer"
 }
-
-
-
 
 # ── CORS / CSRF ───────────────────────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = [
@@ -149,7 +151,6 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
 ]
 CORS_ALLOW_CREDENTIALS = True
-
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",

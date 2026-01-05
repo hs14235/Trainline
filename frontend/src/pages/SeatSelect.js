@@ -18,7 +18,7 @@ const AVAILABLE_SEATS = [
   'Priority BoardingB','Priority BoardingB','Priority BoardingB','Priority BoardingB',
   'Priority BoardingB','Priority BoardingB','Priority BoardingB','Priority BoardingB'
   
-]
+]   
 
 export default function SeatSelect() {
   useEffect(() => {

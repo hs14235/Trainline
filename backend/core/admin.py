@@ -5,9 +5,14 @@ from .models import TrainTrip, Ticket, Passenger, MembershipLevel
 
 User = get_user_model()
 
+# Helper for membership_level if it's a FK and nullable
+def get_membership_level(obj):
+    return obj.membership_level.level_name if obj.membership_level else "-"
+get_membership_level.short_description = 'Membership Level'
+
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
-    list_display = ('email', 'first_name', 'last_name', 'is_active', 'membership_level')
+    list_display = ('email',  'is_active', get_membership_level)
     search_fields = ('email',)
 
 @admin.register(TrainTrip)
@@ -18,18 +23,17 @@ class TrainTripAdmin(admin.ModelAdmin):
         'destination_station',
         'departure_time',
         'arrival_time',
-        'status',          
-        'consist_type',   
-        'platform',          
+        'status',
+        'platform',
     )
     search_fields = ('service_number', 'origin_station', 'destination_station', 'status')
     list_filter = ("status",)
 
 @admin.register(Ticket)
 class TicketAdmin(admin.ModelAdmin):
-    list_display = ('ticket_id', 'passenger', 'train_trip', 'paid','amount', 'priority_boarding', 'meal', 'booked_at')
-    list_filter  = ('paid', 'priority_boarding', 'meal')
-    search_fields= ('ticket_id', 'passenger__user__user_id', 'train_trip_service_number')
+    list_display = ('passenger', 'train_trip', 'paid', 'amount', 'priority_boarding', 'meal', 'booked_at')
+    list_filter = ('paid', 'priority_boarding', 'meal')
+    search_fields = ('id', 'passenger__user__email', 'train_trip__service_number')
 
 @admin.register(Passenger)
 class PassengerAdmin(admin.ModelAdmin):
@@ -39,4 +43,4 @@ class PassengerAdmin(admin.ModelAdmin):
 @admin.register(MembershipLevel)
 class MembershipLevelAdmin(admin.ModelAdmin):
     list_display = ('level_name', 'min_points_required')
-    ordering     = ('min_points_required',)
+    ordering = ('min_points_required',)
