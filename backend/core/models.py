@@ -149,7 +149,7 @@ class Ticket(models.Model):
     train_trip = models.ForeignKey(TrainTrip, on_delete=models.CASCADE, related_name="tickets")
     booked_at = models.DateTimeField(auto_now_add=True)
 
-    seat_number = models.CharField(max_length=10)
+    seat_number = models.CharField(max_length=10, blank=True, default='')
     paid = models.BooleanField(default=False)
     amount = models.DecimalField(max_digits=8, decimal_places=2, default=0)
 
@@ -167,11 +167,16 @@ class Ticket(models.Model):
         indexes = [
             models.Index(fields=['paid'], name='ticket_paid_idx'),
         ]
-        unique_together = ('train_trip', 'seat_number')
         constraints = [
             models.CheckConstraint(
                 check=models.Q(amount__gte=0),
                 name='ticket_amount_non_negative'
+            ),
+            # Prevent double-booking: same seat on same trip (but allow empty seat_number)
+            models.UniqueConstraint(
+                fields=['train_trip', 'seat_number'],
+                condition=~models.Q(seat_number=''),
+                name='unique_train_seat_when_assigned'
             ),
         ]
 
