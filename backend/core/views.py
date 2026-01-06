@@ -62,23 +62,7 @@ class TrainTripViewSet(viewsets.ReadOnlyModelViewSet):
             booked_at=timezone.now(),
         )
 
-        levels = MembershipLevel.objects.filter(level_name="Bronze")
-        if levels.exists():
-            bronze_level = levels.first()
-        else:
-            bronze_level = MembershipLevel.objects.create(
-            level_name="Bronze",
-            min_points_required=0,
-            perks_description="Welcome aboard"
-    )
-
-
-        passenger, created = Passenger.objects.get_or_create(
-            user=request.user,
-            defaults={'membership_level': bronze_level  }
-                )
-            
-       # award a single point if the ticket is created fully-loaded
+        # award a single point if the ticket is created fully-loaded
         points_earned = 1 if (pb and meal and accom and taxi) else 0
         if points_earned:
             passenger.membership_points = (passenger.membership_points or 0) + points_earned
