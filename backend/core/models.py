@@ -61,7 +61,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 ### ------------------------
 
 class MembershipLevel(models.Model):
-    level_name = models.CharField(max_length=16)
+    level_name = models.CharField(max_length=16, unique=True)
     min_points_required = models.IntegerField()
     perks_description = models.CharField(max_length=100, blank=True)
 
@@ -86,6 +86,12 @@ class Passenger(models.Model):
         indexes = [
             models.Index(fields=['user'], name='passenger_user_idx'),
             models.Index(fields=['membership_points'], name='passenger_points_idx'),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(membership_points__gte=0),
+                name='passenger_points_non_negative'
+            ),
         ]
 
     def __str__(self):
@@ -112,6 +118,10 @@ class TrainTrip(models.Model):
 
     class Meta:
         db_table = 'train_trip'
+        indexes = [
+            models.Index(fields=['departure_time'], name='traintrip_departure_idx'),
+            models.Index(fields=['status'], name='traintrip_status_idx'),
+        ]
 
     def __str__(self):
         return f"{self.service_number} ({self.origin_station} → {self.destination_station})"
@@ -156,6 +166,13 @@ class Ticket(models.Model):
         db_table = 'ticket'
         indexes = [
             models.Index(fields=['paid'], name='ticket_paid_idx'),
+        ]
+        unique_together = ('train_trip', 'seat_number')
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(amount__gte=0),
+                name='ticket_amount_non_negative'
+            ),
         ]
 
 
