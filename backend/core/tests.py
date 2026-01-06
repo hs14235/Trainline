@@ -102,3 +102,82 @@ class PaymentAndMembershipTests(TestCase):
         self.assertEqual(resp.data.get('membership_level'), 'Gold')
         self.passenger.refresh_from_db()
         self.assertEqual(self.passenger.membership_points, 6)
+
+    def test_silver_member_stays_silver_after_payment(self):
+        """Verify Silver membership is maintained after payment (not reset to Bronze)"""
+        # Set passenger to Silver (3 points)
+        self.passenger.membership_points = 3
+        self.passenger.save()
+        update_membership_level(self.passenger)
+        self.passenger.refresh_from_db()
+        self.assertEqual(self.passenger.membership_level.level_name, 'Silver')
+
+        # Create unpaid ticket with all add-ons already selected (so payment doesn't add points)
+        t = Ticket.objects.create(
+            passenger=self.passenger,
+            train_trip=self.trip,
+            seat_number='5A',
+            priority_boarding=True,
+            meal=True,
+            accommodation=True,
+            taxi=True,
+            paid=False,
+            amount=280
+        )
+
+        # Pay for the ticket
+        resp = self.client.post(f'/api/tickets/{t.pk}/pay/', {'payment_method': 'credit_card'}, format='json')
+        self.assertEqual(resp.status_code, 200)
+        
+        # Verify membership is still Silver (not reset to Bronze)
+        self.assertEqual(resp.data.get('membership_level'), 'Silver')
+        self.assertEqual(resp.data.get('membership_points'), 3)
+        
+        # Verify in database
+        self.passenger.refresh_from_db()
+        self.assertEqual(self.passenger.membership_points, 3)
+        self.assertEqual(self.passenger.membership_level.level_name, 'Silver')
+
+    def test_ticket_without_seat_allowed(self):
+        """Verify tickets can be created without seat assignment"""
+        t = Ticket.objects.create(
+            passenger=self.passenger,
+            train_trip=self.trip,
+            seat_number='',  # No seat assigned yet
+            paid=False,
+            amount=100
+        )
+        self.assertEqual(t.seat_number, '')
+        
+        # Multiple tickets without seats should be allowed
+        t2 = Ticket.objects.create(
+            passenger=self.passenger,
+            train_trip=self.trip,
+            seat_number='',
+            paid=False,
+            amount=100
+        )
+        self.assertEqual(t2.seat_number, '')
+
+    def test_double_booking_same_seat_prevented(self):
+        """Verify same seat cannot be booked twice on same trip"""
+        from django.db import IntegrityError
+        
+        # Create first ticket with seat 1A
+        Ticket.objects.create(
+            passenger=self.passenger,
+            train_trip=self.trip,
+            seat_number='1A',
+            paid=False,
+            amount=100
+        )
+        
+        # Try to create another ticket with same seat
+        with self.assertRaises(IntegrityError):
+            Ticket.objects.create(
+                passenger=self.passenger,
+                train_trip=self.trip,
+                seat_number='1A',
+                paid=False,
+                amount=100
+            )
