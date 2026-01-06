@@ -62,7 +62,7 @@ class TrainTripViewSet(viewsets.ReadOnlyModelViewSet):
             booked_at=timezone.now(),
         )
 
-        # award a single point if the ticket is created fully-loaded
+        # award a single point if the ticket is created with all 4 add-ons (fully-loaded)
         points_earned = 1 if (pb and meal and accom and taxi) else 0
         if points_earned:
             passenger.membership_points = (passenger.membership_points or 0) + points_earned
