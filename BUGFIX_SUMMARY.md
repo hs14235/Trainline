@@ -49,7 +49,23 @@ const level = user.membership_level || "Bronze";
 #### Issue 3b: Double-Booking Seats
 **Problem**: `Ticket.seat_number` was a CharField with no uniqueness constraint per train trip, allowing the same seat to be booked multiple times.
 
-**Solution**: Added `unique_together = ('train_trip', 'seat_number')` to Ticket model.
+**Solution**: 
+- Made `seat_number` optional (`blank=True, default=''`) to support booking flow where seats are assigned later
+- Added **partial unique constraint** that prevents double-booking when a seat IS assigned:
+  ```python
+  models.UniqueConstraint(
+      fields=['train_trip', 'seat_number'],
+      condition=~models.Q(seat_number=''),
+      name='unique_train_seat_when_assigned'
+  )
+  ```
+- This allows:
+  - ✅ Multiple tickets without seat assignments (empty seat_number)
+  - ✅ Prevents same seat from being booked twice on same trip
+  
+**Tests Added**:
+- `test_ticket_without_seat_allowed` - Verifies multiple tickets can have empty seat_number
+- `test_double_booking_same_seat_prevented` - Verifies integrity error when trying to double-book
 
 #### Issue 3c: Negative Values
 **Problem**: No constraints preventing negative membership points or ticket amounts.
@@ -113,9 +129,10 @@ When a user pays for a ticket:
 
 ### Implemented (Priority 1 - Critical):
 - ✅ Unique constraint on MembershipLevel.level_name
-- ✅ Unique constraint on Ticket(train_trip, seat_number)
+- ✅ Partial unique constraint on Ticket(train_trip, seat_number) when assigned
 - ✅ Check constraints for non-negative values
 - ✅ Performance indexes on frequently queried fields
+- ✅ seat_number made optional to support booking flow
 
 ### Future Considerations (Priority 2-3):
 1. **Clarify Passenger-User Relationship**: Currently 1:1 (one passenger per user), but `relationship` field suggests intent for multi-passenger support
@@ -132,9 +149,19 @@ test_book_full_awards_point_and_updates_level
 test_partial_update_awards_point_when_ticket_becomes_full  
 test_pay_does_not_override_points_but_returns_level
 test_silver_member_stays_silver_after_payment
+test_ticket_without_seat_allowed
+test_double_booking_same_seat_prevented
 
-Ran 4 tests in 0.842s - OK
+Ran 6 tests in 1.231s - OK
 ```
+
+---
+
+## Security
+
+✅ **CodeQL Security Scan**: 0 vulnerabilities detected
+- Python: No alerts
+- JavaScript: No alerts
 
 ---
 
@@ -146,6 +173,13 @@ Ran 4 tests in 0.842s - OK
 - Schema improvements implemented
 - Data integrity constraints in place
 - Performance optimizations added
+- Security scan clean
+
+### Migrations Applied:
+- `0001_initial` - Initial schema
+- `0002_add_performance_indexes` - Performance indexes
+- `0003_schema_improvements` - Critical constraints
+- `0004_fix_seat_number_optional` - Seat assignment fix
 
 ### Deployment Steps (from DEPLOYMENT_ROADMAP.md):
 1. Generate Django SECRET_KEY
@@ -161,8 +195,10 @@ Ran 4 tests in 0.842s - OK
 ✅ **Membership bug fixed**: Frontend now uses backend membership_level  
 ✅ **Schema improved**: Added constraints and indexes  
 ✅ **Code cleaned**: Removed duplicate passenger creation  
-✅ **Tests added**: Verified payment flow doesn't reset membership  
+✅ **Tests added**: Verified payment flow and seat constraints  
 ✅ **Performance optimized**: Strategic database indexes  
 ✅ **Docker fixed**: Build now works correctly  
+✅ **Security verified**: No vulnerabilities detected  
+✅ **Seat booking fixed**: Supports unassigned seats and prevents double-booking  
 
-The project is now **production-ready** with proper data integrity, performance optimization, and bug fixes!
+The project is now **production-ready** with proper data integrity, performance optimization, bug fixes, and security validation!
