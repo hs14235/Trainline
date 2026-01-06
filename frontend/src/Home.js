@@ -38,14 +38,8 @@ export default function Home() {
   if (error)   return <p style={{ color: "crimson" }}>{error}</p>;
 
   const points = user.membership_points || 0;
-  let level = "Bronze";
-  if (points >= 10) {
-    level = "Platinum";
-  } else if (points >= 6) {
-    level = "Gold";
-  } else if (points >= 3) {
-    level = "Silver";
-  }
+  // Use the backend-provided membership_level instead of calculating client-side
+  const level = user.membership_level || "Bronze";
   
 
   const addFlag = async (ticketId, field) => {

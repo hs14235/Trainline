@@ -83,6 +83,10 @@ class Passenger(models.Model):
 
     class Meta:
         db_table = 'passenger'
+        indexes = [
+            models.Index(fields=['user'], name='passenger_user_idx'),
+            models.Index(fields=['membership_points'], name='passenger_points_idx'),
+        ]
 
     def __str__(self):
         return self.full_name
@@ -150,6 +154,9 @@ class Ticket(models.Model):
 
     class Meta:
         db_table = 'ticket'
+        indexes = [
+            models.Index(fields=['paid'], name='ticket_paid_idx'),
+        ]
 
 
 class Payment(models.Model):
@@ -179,6 +186,10 @@ class Notification(models.Model):
 
     class Meta:
         db_table = 'notification'
+        indexes = [
+            models.Index(fields=['user'], name='notification_user_idx'),
+            models.Index(fields=['is_read'], name='notification_read_idx'),
+        ]
 
 
 class ChatMessage(models.Model):

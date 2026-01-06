@@ -115,6 +115,7 @@ class PassengerSerializer(serializers.ModelSerializer):
 
 
 class NotificationSerializer(serializers.ModelSerializer):
+    notification_id = serializers.IntegerField(source='pk', read_only=True)
     train_trip = TrainTripSerializer(read_only=True)
     flight = TrainTripSerializer(source="train_trip", read_only=True)
     sent_date = serializers.DateTimeField(source='sent_at', read_only=True)
