@@ -129,6 +129,7 @@ export default function Home() {
                         : <button onClick={() => navigate(`/payment/${t.ticket_id}`)}
                          data-tooltip-id="main-tip"
                          data-tooltip-content="Pay">
+                          💳
                           </button>
                       }
                     </td>
