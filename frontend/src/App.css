@@ -67,6 +67,52 @@ nav a {
   box-shadow: 0 4px 14px rgba(0,0,0,.14);
 }
 
+.tickets-toggle {
+  color: #fff;
+  text-decoration: none;
+  text-shadow: 0 2px 8px rgba(0,0,0,.45);
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255,255,255,0.12);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: .3px;
+
+  transition: transform .08s ease, box-shadow .15s ease, filter .15s ease;
+}
+.tickets-toggle:hover {
+  transform: translateY(-1px);
+  background: rgba(255,255,255,0.18);
+  box-shadow: 0 8px 24px rgba(0,0,0,.18);
+  filter: brightness(1.05);
+}
+.tickets-toggle:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 14px rgba(0,0,0,.14);
+}
+
+.tickets-section {
+  animation: slideIn 0.2s ease;
+  margin-top: 1rem;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+
 [data-tip] { position: relative; }
 [data-tip]::after {
   content: attr(data-tip);
