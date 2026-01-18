@@ -29,15 +29,17 @@ services:
     container_name: trainline-backend
     environment:
       - DJANGO_DEBUG=False
-      - ALLOWED_HOSTS=0.0.0.0,127.0.0.1,localhost,your-domain.com,api.your-domain.com
-      - CORS_ALLOWED_ORIGINS=https://your-domain.com
-      - CSRF_TRUSTED_ORIGINS=https://your-domain.com
+      - ALLOWED_HOSTS=0.0.0.0,127.0.0.1,localhost,backend,your-domain.com,api.your-domain.com
+      - CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,https://your-domain.com
+      - CSRF_TRUSTED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,https://your-domain.com
     restart: unless-stopped
 
   frontend:
     build: 
       context: .
       dockerfile: frontend/Dockerfile
+      args:
+        REACT_APP_API_BASE: http://backend:8000
     container_name: trainline-frontend
     depends_on:
       - backend
