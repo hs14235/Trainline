@@ -15,6 +15,7 @@ User = get_user_model()
 
 class CustomRegisterSerializer(RegisterSerializer):
     username = serializers.CharField(required=True)
+    email = serializers.EmailField(required=True)   
 
     def validate(self, data):
         print("VALIDATED DATA IN REGISTER SERIALIZER:", data)
@@ -31,9 +32,6 @@ class CustomRegisterSerializer(RegisterSerializer):
         data['email'] = self.validated_data.get('email', '')
         data['password1'] = self.validated_data.get('password1', '')
         data['password2'] = self.validated_data.get('password2', '')
-        data['first_name'] = self.validated_data.get('first_name', '')
-        data['last_name'] = self.validated_data.get('last_name', '')
-        data['passport_number'] = self.validated_data.get('passport_number', '')
         return data
     
     class Meta:
@@ -51,16 +49,8 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = [
-            "user_id",
-            "first_name",
-            "last_name",
-            "email",
-            "membership_level",
-            "membership_points",
-        ]
-        read_only_fields = ['user_id', 'email', 'membership_points', 'membership_level']
-
+        fields = ["id", "first_name", "last_name", "email", "membership_level", "membership_points"]
+        read_only_fields = ["id", "email", "membership_points", "membership_level"]
 
 
 class TrainTripSerializer(serializers.ModelSerializer):

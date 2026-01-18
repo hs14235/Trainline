@@ -21,8 +21,8 @@ export default function Home() {
     if (!token) return navigate("/login");
 
     Promise.all([
-      api.get("user/"),
-      api.get("tickets/"),
+      api.get("/api/me/"),
+      api.get("/api/tickets/"),
     ])
       .then(([uRes, tRes]) => {
         setUser(uRes.data);
@@ -38,32 +38,26 @@ export default function Home() {
   if (loading) return <p>Loading…</p>;
   if (error)   return <p style={{ color: "crimson" }}>{error}</p>;
 
-  const points = user.membership_points |0;
-  let level = "Bronze";
-  if (points >= 7) {
-    level = "Platinum";
-  } else if (points >= 4) {
-    level = "Gold";
-  } else if (points >= 2) {
-    level = "Silver";
-  }
-  
+  const points = user?.membership_points ?? 0;
+  const level = user?.membership_level ?? "Bronze";
+
 
   const addFlag = async (ticketId, field) => {
     try {
-      await api.patch(`tickets/${ticketId}/`, { [field]: true });
+      await api.patch(`/api/tickets/${ticketId}/`, { [field]: true });
 
-      const [uRes, tRes] = await Promise.all([
-        api.get("user/"),
-        api.get("tickets/")
+      const [meRes, tRes] = await Promise.all([
+        api.get("/api/me/"),
+        api.get("/api/tickets/"),
       ]);
 
-      setUser(uRes.data);
+      setUser(meRes.data);
       setTickets(tRes.data);
     } catch (e) {
       console.error(e);
     }
   };
+
 
   return (
     <div style={{ margin: "1rem 0"}}>

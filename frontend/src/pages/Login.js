@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../api';
 
 export default function Login() {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const navigate = useNavigate();
@@ -13,9 +13,7 @@ export default function Login() {
     setError(null);
 
     try {
-      await api.get("/dj-rest-auth/login/");   // prime CSRF cookie
-
-      const res = await api.post('/dj-rest-auth/login/', { email, password });
+      const res = await api.post('/dj-rest-auth/login/', { username , password });
       const token = res.data.key || res.data.token;
       if (token) localStorage.setItem('token', token);
 
@@ -41,8 +39,8 @@ export default function Login() {
 
       <form noValidate onSubmit={handleSubmit}>
         <div style={{ marginBottom: '1rem' }}>
-          <label>Email</label><br />
-          <input type="email" value={email} onChange={e => setEmail(e.target.value)} required style={{ width: '100%' }} />
+          <label>Username</label><br />
+          <input type="text" value={username} onChange={e => setUsername(e.target.value)} required style={{ width: '100%' }} />
         </div>
 
         <div style={{ marginBottom: '1rem' }}>

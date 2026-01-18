@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 from django.http import JsonResponse
 
 from core.views import (
-    TrainTripViewSet, TicketViewSet, UserDetailView,
+    TrainTripViewSet, TicketViewSet, MeView,
     SeatListCreateView, NotificationViewSet,
 )
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
@@ -22,12 +22,12 @@ urlpatterns = [
 
     # API
     path("api/", include(router.urls)),
-    path("api/seats/", SeatListCreateView.as_view(), name="seat-list-create"),
-    path("api/me/", UserDetailView.as_view(), name="me"),
+    path("api/seats/<str:flight_id>/", SeatListCreateView.as_view(), name="seat-list-create"),
+    path("api/me/", MeView.as_view(), name="me"),
 
     # auth
     path("dj-rest-auth/", include("dj_rest_auth.urls")),
-    path("dj-rest-auth/registration/", include("dj_rest_auth.registration.urls")),
+    path("api/dj-rest-auth/registration/", include("dj_rest_auth.registration.urls")),
 
     # docs
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),

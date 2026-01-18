@@ -20,12 +20,11 @@ export default function Flights() {
     const load = async () => {
       setLoading(true);
       try {
-        const r1 = await api.get('trips/');
-        if (!cancelled) setTrips(r1.data);
+        const r1 = await api.get('/train-trips/');
+         setTrips(r1.data);
       } catch (e1) {
         try {
-          const r2 = await api.get('flights/');
-          if (!cancelled) setTrips(r2.data);
+          if (!cancelled) setTrips(r1.data);
         } catch (e2) {
           if (!cancelled) setError(e2);
         }

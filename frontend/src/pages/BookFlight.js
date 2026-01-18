@@ -27,7 +27,7 @@ export default function BookFlight() {
   }, []);
 
   useEffect(() => {
-    api.get(`flights/${flightId}/`)
+    api.get(`/api/train-trips/${flightId}/`)
       .then(res => {
         setBaseFare(res.data.fare ?? 100);
       })
@@ -50,10 +50,7 @@ export default function BookFlight() {
         accommodation:     accommodation,
         taxi:              taxi,
       };
-      const res = await api.post(
-        `flights/${flightId}/book/`,
-        payload
-      );
+      const res = await api.post(`/api/train-trips/${flightId}/book/`, payload);
       navigate(`/payment/${res.data.ticket_id}`);
     } catch (err) {
       console.error(err);

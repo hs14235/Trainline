@@ -33,12 +33,12 @@ def recalc_membership(sender, instance, **kwargs):
             "perks_description": "Standard boarding"
         }
     else:
-        level_name, defaults = None, {}
-
+        level_name, defaults = "Bronze", {
+            "min_points_required": 0,
+            "perks_description": "Welcome aboard"
+        }
     if level_name:
         lvl, _ = MembershipLevel.objects.get_or_create(level_name=level_name, defaults=defaults)
         passenger.membership_level = lvl
-    else:
-        passenger.membership_level = None
 
     passenger.save()

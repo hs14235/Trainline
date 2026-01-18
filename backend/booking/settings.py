@@ -131,13 +131,14 @@ SPECTACULAR_SETTINGS = {
     "VERSION": env("SPECTACULAR_VERSION", default="1.0.0"),
 }
 
-ACCOUNT_SIGNUP_FIELDS = ['email', 'username', 'password1', 'password2']
-ACCOUNT_AUTHENTICATION_METHOD = 'username'  # or 'email' or 'username_email'
-ACCOUNT_USERNAME_REQUIRED = True  # or False, depending on the above
+ACCOUNT_LOGIN_METHODS = {"username"}
+ACCOUNT_SIGNUP_FIELDS = ["username", "email", "password1", "password2"]
+ACCOUNT_AUTHENTICATION_METHOD = "username"
+ACCOUNT_USERNAME_REQUIRED = True
 ACCOUNT_EMAIL_REQUIRED = True
 
 REST_AUTH_REGISTER_SERIALIZERS = {
-    'register': 'core.serializers.CustomRegisterSerializer',
+    'REGISTER_SERIALIZER': 'core.serializers.CustomRegisterSerializer'
 }
 
 

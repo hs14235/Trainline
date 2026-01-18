@@ -34,25 +34,11 @@ class MembershipLevel(models.Model):
         db_table = 'membership_level'
 
 class Passenger(models.Model):
-    user = models.OneToOneField(
-        settings.AUTH_USER_MODEL,
-          on_delete=models.CASCADE)
-    
-    relationship = models.CharField(max_length=10, blank=True, null=True)
-        
-    membership_level = models.ForeignKey(
-        MembershipLevel,
-        on_delete=models.PROTECT,
-        null=True,
-        blank=True,
-    )
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="passenger")
+    full_name = models.CharField(max_length=100)
     passport_number = models.CharField(max_length=20, unique=True)
-
+    membership_level = models.ForeignKey(MembershipLevel, on_delete=models.PROTECT, null=True, blank=True)
     membership_points = models.IntegerField(default=0)
-
-    
-    class Meta:
-        db_table = 'passenger'
 
 class Seat(models.Model):
     train_trip = models.ForeignKey(TrainTrip, on_delete=models.CASCADE, related_name="seats")
@@ -125,23 +111,24 @@ class Payment(models.Model):
 class UserManager(BaseUserManager):
     use_in_migrations = True
 
-    def create_user(self, user_id, email, password=None, **extra_fields):
-        if not user_id:
-            raise ValueError("`user_id` must be set")
+    def create_user(self, username, email, password=None, **extra_fields):
+        if not username:
+            raise ValueError("`username` must be set")
         email = self.normalize_email(email)
-        user = self.model(user_id=user_id, email=email, **extra_fields)
+        user = self.model(username=username, email=email, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, user_id, email, password=None, **extra_fields):
+    def create_superuser(self, username, email, password=None, **extra_fields):
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
-        return self.create_user(user_id, email, password, **extra_fields)
+        return self.create_user(username, email, password, **extra_fields)
 
 
 class User(AbstractBaseUser, PermissionsMixin):
-    username = models.CharField(max_length=150, unique=True, default='default_user')
+    username = models.CharField(max_length=150, unique=True)
+    email = models.EmailField(max_length=75, unique=True)
     passport_number = models.CharField(
         max_length=20,
         unique=False,        
@@ -149,7 +136,6 @@ class User(AbstractBaseUser, PermissionsMixin):
         null=True,         
         default=None,
     )
-    email            = models.CharField(max_length=75, unique=True)
     first_name       = models.CharField(max_length=32)
     last_name        = models.CharField(max_length=50, blank=True)
     membership_level = models.ForeignKey(
@@ -165,7 +151,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     last_login   = models.DateTimeField(null=True, blank=True)
     date_joined  = models.DateTimeField(auto_now_add=True)
 
-    USERNAME_FIELD  = 'email'
+    USERNAME_FIELD  = 'username'
     REQUIRED_FIELDS = []
 
     objects = UserManager()
