@@ -33,6 +33,11 @@ services:
         condition: service_healthy
     container_name: trainline-backend
     environment:
+      # WARNING: These are development-only values. For production:
+      # 1. Generate a strong DJANGO_SECRET_KEY and store it securely
+      # 2. Set DJANGO_DEBUG=False
+      # 3. Update ALLOWED_HOSTS with your actual domain
+      # 4. Use Docker secrets or environment files for sensitive values
       - DJANGO_SECRET_KEY=dev-secret-key-change-in-production
       - DJANGO_DEBUG=True
       - ALLOWED_HOSTS=0.0.0.0,127.0.0.1,localhost
