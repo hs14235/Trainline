@@ -8,6 +8,7 @@ export default function Home() {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showTickets, setShowTickets] = useState(false);
   const navigate = useNavigate();
 
   
@@ -77,75 +78,90 @@ export default function Home() {
      </Link>
      </nav>
 
-      <h2>Your Tickets</h2>
-      {tickets.length === 0 ? (
-        <p>No tickets yet.</p>
-      ) : (
-        <table border="1" cellPadding="6">
-          <thead>
-            <tr>
-              <th>#</th><th>Trip</th><th>Seat</th><th>Paid?</th><th>Method</th>
-              <th>Priority</th><th>Meal</th><th>Accom</th><th>Taxi</th><th>Booked At</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-             {tickets.map(t => {
-              const trip = t.train_trip || t.flight || {};
-              const serviceNo = trip.service_number ?? trip.flight_number;
+      <button
+        className="nav-link tickets-toggle"
+        onClick={() => setShowTickets(!showTickets)}
+        data-tooltip-id="main-tip"
+        data-tooltip-content={showTickets ? "Hide tickets" : "Browse and manage tickets"}
+        style={{ margin: "1rem 0" }}
+      >
+        🎫 {showTickets ? "Hide" : "Show"} Tickets
+      </button>
 
-              return (
-                <tr key={t.ticket_id}>
-                  <td>{t.ticket_id}</td>
-                  <td>{serviceNo ?? '—'}</td>
-                  <td>
-                  {t.seat_num
-                    ? t.seat_num
-                    : <Link to={`/select-seat/${t.ticket_id}`}>Pick Seat</Link>
-                  }
-                </td>
-                <td>
-                  {t.paid
-                    ? "✅"
-                    : <button onClick={() => navigate(`/payment/${t.ticket_id}`)}
-                     data-tooltip-id="main-tip"
-                     data-tooltip-content="Pay">
-                      </button>
-                  }
-                </td>
-                <td>{t.payment_method || "—"}</td>
-                <td>{t.priority_boarding ? "✅" : "No"}</td>
-                <td>{t.meal              ? "✅" : "No"}</td>
-                <td>{t.accommodation     ? "✅" : "No"}</td>
-                <td>{t.taxi             ? "✅" : "No"}</td>
-                <td>{new Date(t.booked_at).toLocaleDateString()}</td>
-                <td>
-                  {!t.priority_boarding &&
-                    <button onClick={() =>
-                      addFlag(t.ticket_id, "priority_boarding")
-                    } >Add Priority</button>
-                  }
-                  {!t.meal &&
-                    <button onClick={() =>
-                      addFlag(t.ticket_id, "meal")
-                    }>Add Meal</button>
-                  }
-                  {!t.accommodation &&
-                    <button onClick={() =>
-                      addFlag(t.ticket_id, "accommodation")
-                    }>Add Accom</button>
-                  }
-                  {!t.taxi &&
-                    <button onClick={() =>
-                      addFlag(t.ticket_id, "taxi")
-                    }>Add Taxi</button>
-                  }
-                  </td>
+      {showTickets && (
+        <div className="tickets-section">
+          <h2>Your Tickets</h2>
+          {tickets.length === 0 ? (
+            <p>No tickets yet.</p>
+          ) : (
+            <table border="1" cellPadding="6">
+              <thead>
+                <tr>
+                  <th>#</th><th>Trip</th><th>Seat</th><th>Paid?</th><th>Method</th>
+                  <th>Priority</th><th>Meal</th><th>Accom</th><th>Taxi</th><th>Booked At</th>
+                  <th>Actions</th>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              </thead>
+              <tbody>
+                 {tickets.map(t => {
+                  const trip = t.train_trip || t.flight || {};
+                  const serviceNo = trip.service_number ?? trip.flight_number;
+
+                  return (
+                    <tr key={t.ticket_id}>
+                      <td>{t.ticket_id}</td>
+                      <td>{serviceNo ?? '—'}</td>
+                      <td>
+                      {t.seat_num
+                        ? t.seat_num
+                        : <Link to={`/select-seat/${t.ticket_id}`}>Pick Seat</Link>
+                      }
+                    </td>
+                    <td>
+                      {t.paid
+                        ? "✅"
+                        : <button onClick={() => navigate(`/payment/${t.ticket_id}`)}
+                         data-tooltip-id="main-tip"
+                         data-tooltip-content="Pay">
+                          💳
+                          </button>
+                      }
+                    </td>
+                    <td>{t.payment_method || "—"}</td>
+                    <td>{t.priority_boarding ? "✅" : "No"}</td>
+                    <td>{t.meal              ? "✅" : "No"}</td>
+                    <td>{t.accommodation     ? "✅" : "No"}</td>
+                    <td>{t.taxi             ? "✅" : "No"}</td>
+                    <td>{new Date(t.booked_at).toLocaleDateString()}</td>
+                    <td>
+                      {!t.priority_boarding &&
+                        <button onClick={() =>
+                          addFlag(t.ticket_id, "priority_boarding")
+                        } >Add Priority</button>
+                      }
+                      {!t.meal &&
+                        <button onClick={() =>
+                          addFlag(t.ticket_id, "meal")
+                        }>Add Meal</button>
+                      }
+                      {!t.accommodation &&
+                        <button onClick={() =>
+                          addFlag(t.ticket_id, "accommodation")
+                        }>Add Accom</button>
+                      }
+                      {!t.taxi &&
+                        <button onClick={() =>
+                          addFlag(t.ticket_id, "taxi")
+                        }>Add Taxi</button>
+                      }
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
       )}
     </div>
   );
