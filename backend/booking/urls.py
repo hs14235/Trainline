@@ -26,7 +26,7 @@ urlpatterns = [
     path("api/me/", MeView.as_view(), name="me"),
 
     # auth
-    path("dj-rest-auth/", include("dj_rest_auth.urls")),
+    path("api/dj-rest-auth/", include("dj_rest_auth.urls")),
     path("api/dj-rest-auth/registration/", include("dj_rest_auth.registration.urls")),
 
     # docs
