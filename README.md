@@ -73,6 +73,61 @@ Frontend
 
 ---
 
+## Docker Setup & Installation
+
+### Prerequisites
+- Docker and Docker Compose installed on your system
+
+### Quick Start with Docker
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/hs14235/Trainline.git
+   cd Trainline
+   ```
+
+2. **Setup backend environment** (already created for Docker)
+   ```bash
+   # The backend/.env file is already configured for Docker
+   # No changes needed unless you want to customize
+   ```
+
+3. **Build and start all services**
+   ```bash
+   docker compose up --build
+   ```
+
+4. **Access the application**
+   - Frontend: http://localhost:3000
+   - Backend API: http://localhost:8000/api
+   - Admin Panel: http://localhost:8000/admin
+
+### Docker Commands
+```bash
+# Start services in background
+docker compose up -d
+
+# Stop services
+docker compose down
+
+# View logs
+docker compose logs -f
+
+# Rebuild after code changes
+docker compose up --build
+
+# Reset database (removes all data)
+docker compose down -v
+docker compose up --build
+```
+
+### Notes
+- The backend automatically runs migrations on startup
+- Database data is persisted in a Docker volume
+- Frontend is built with the correct API URL for Docker networking
+- CORS is pre-configured for localhost access
+
+---
+
 ## Credits
 - Built for **CSCI 3321 - Database Systems & potential employers for insight on improvement**
 - Thanks a lot to **Dr. Weitian Tong** for succint teaching with good sources of practice via website 
