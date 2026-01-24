@@ -1,3 +1,5 @@
+import re
+
 from django.utils import timezone       
 from django.db import transaction
 from requests import request
@@ -5,7 +7,6 @@ from rest_framework import status, viewsets, generics, permissions
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-import re
 
 from .models import TrainTrip, Ticket, Passenger
 from .serializers import TrainTripSerializer, TicketSerializer  
@@ -146,6 +147,9 @@ class SeatListCreateView(generics.GenericAPIView):
         # Input validation
         if not seat or not ticket_id:
             return Response({"error": "seat_num and ticket_id are required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Normalize seat input
+        seat = str(seat).strip().upper()
         
         # Validate ticket_id is an integer
         try:
