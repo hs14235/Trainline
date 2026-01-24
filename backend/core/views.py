@@ -5,6 +5,7 @@ from rest_framework import status, viewsets, generics, permissions
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+import re
 
 from .models import TrainTrip, Ticket, Passenger
 from .serializers import TrainTripSerializer, TicketSerializer  
@@ -146,6 +147,16 @@ class SeatListCreateView(generics.GenericAPIView):
         if not seat or not ticket_id:
             return Response({"error": "seat_num and ticket_id are required"}, status=status.HTTP_400_BAD_REQUEST)
         
+        # Validate ticket_id is an integer
+        try:
+            ticket_id = int(ticket_id)
+        except (ValueError, TypeError):
+            return Response({"error": "ticket_id must be a valid integer"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validate seat_num format (1-2 digits followed by A-F)
+        if not re.match(r'^\d{1,2}[A-F]$', seat):
+            return Response({"error": "seat_num must be 1-2 digits followed by A-F (e.g., 12A)"}, status=status.HTTP_400_BAD_REQUEST)
+        
         try:
             # Use atomic transaction with row-level locking to prevent race conditions
             with transaction.atomic():
@@ -155,9 +166,9 @@ class SeatListCreateView(generics.GenericAPIView):
                     passenger__user=request.user
                 )
                 
-                # Verify ticket belongs to the correct flight
+                # Verify ticket belongs to the correct trip
                 if ticket.train_trip and ticket.train_trip.trip_id != flight_id:
-                    return Response({"error": "Ticket does not belong to this flight"}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({"error": "Ticket does not belong to this trip"}, status=status.HTTP_400_BAD_REQUEST)
                 
                 # Check if seat is already taken (with row locking)
                 existing_seat = Ticket.objects.select_for_update().filter(

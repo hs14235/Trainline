@@ -10,7 +10,7 @@
 
 A comprehensive security audit was performed on the Trainline Django application to identify and fix production readiness issues. The audit discovered **10 critical**, **5 high-priority**, and **4 medium-priority** security vulnerabilities across backend, frontend, and infrastructure components.
 
-**Result:** All critical and high-priority vulnerabilities have been fixed. The application is now production-ready with proper security controls in place.
+**Result:** All identified critical and high-priority backend vulnerabilities have been addressed. The application's backend security has been significantly improved with proper security controls in place. Frontend development dependencies may still show advisories that do not affect production builds.
 
 ---
 
@@ -201,8 +201,8 @@ fi
 
 ### Dependencies
 - ✅ All packages pinned to secure versions
-- ✅ No known vulnerabilities (verified with GitHub Advisory DB)
-- ✅ Development dependencies separated
+- ✅ Backend dependencies verified with GitHub Advisory DB
+- ⚠️ Frontend may show development-only advisories (verify with `npm audit --omit=dev`)
 
 ---
 
@@ -212,8 +212,8 @@ fi
 ```
 ✅ Django security checks (--deploy): PASSED
 ✅ Python syntax validation: PASSED
-✅ CodeQL security scan: 0 alerts
-✅ Dependency vulnerability scan: 0 vulnerabilities
+✅ CodeQL security scan: 0 backend alerts
+✅ Backend dependency vulnerability scan: Critical/high issues addressed
 ✅ Docker build test: SUCCESS
 ```
 
@@ -295,11 +295,11 @@ Before deploying to production:
 
 | Category | Before | After |
 |----------|--------|-------|
-| Critical Vulnerabilities | 10 | 0 |
-| High Priority Issues | 5 | 0 |
-| Medium Priority Issues | 4 | 0 |
-| CodeQL Alerts | N/A | 0 |
-| Vulnerable Dependencies | 30+ | 0 |
+| Critical Vulnerabilities | 10 | 0 (backend) |
+| High Priority Issues | 5 | 0 (backend) |
+| Medium Priority Issues | 4 | 0 (backend) |
+| CodeQL Alerts | N/A | 0 (backend) |
+| Vulnerable Dependencies | 30+ | Critical/high addressed |
 | Security Headers | 2 | 9 |
 | Lines of Code Changed | - | ~500 |
 | Files Modified | - | 10 |
@@ -309,7 +309,7 @@ Before deploying to production:
 
 ## Conclusion
 
-The Trainline Django application has been successfully hardened against common web application vulnerabilities. All critical and high-priority issues have been addressed. The application now follows security best practices and is ready for production deployment with proper configuration.
+The Trainline Django application's backend has been successfully hardened against common web application vulnerabilities. All identified critical and high-priority backend issues have been addressed. The application now follows security best practices for backend services. Frontend development dependencies may still show advisories that do not affect production builds (verify with `npm audit --omit=dev`).
 
 **Recommended Next Steps:**
 1. Review and test all changes in a staging environment
@@ -318,7 +318,7 @@ The Trainline Django application has been successfully hardened against common w
 4. Implement automated dependency updates
 5. Regular security audits (quarterly)
 
-**Sign-off:** All identified security issues have been remediated. The application meets industry standards for secure web application deployment.
+**Sign-off:** All identified backend security issues have been remediated. The backend application meets industry standards for secure web application deployment.
 
 ---
 
