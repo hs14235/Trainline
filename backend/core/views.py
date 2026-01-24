@@ -1,4 +1,5 @@
 from django.utils import timezone       
+from django.db import transaction
 from requests import request
 from rest_framework import status, viewsets, generics, permissions
 from rest_framework.decorators import action
@@ -12,18 +13,22 @@ from .serializers import NotificationSerializer
 from rest_framework.views import APIView
 
 
+def _parse_bool(v):
+    """Parse various boolean representations into Python bool."""
+    if isinstance(v, bool): 
+        return v
+    if v is None: 
+        return False
+    if isinstance(v, (int, float)): 
+        return bool(v)
+    return str(v).strip().lower() in ("1", "true", "t", "yes", "y", "on")
+
+
 
 class TrainTripViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = TrainTrip.objects.all().order_by("departure_time")
     serializer_class = TrainTripSerializer
     permission_classes = [permissions.IsAuthenticated]
-
-    def _parse_bool(v):
-        if isinstance(v, bool): return v
-        if v is None: return False
-        if isinstance(v, (int, float)): return bool(v)
-        return str(v).strip().lower() in ("1", "true", "t", "yes", "y", "on")
-
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def book(self, request, pk=None):
@@ -32,7 +37,10 @@ class TrainTripViewSet(viewsets.ReadOnlyModelViewSet):
         meal = _parse_bool(request.data.get("meal"))
         accom = _parse_bool(request.data.get("accommodation"))
         taxi = _parse_bool(request.data.get("taxi"))
+        
+        # Use fare from trip object, default to 100 if not present
         base_fare = getattr(trip, 'fare', 100)
+        # Calculate total amount server-side (don't trust client)
         amount = base_fare + (50 if pb else 0) + (30 if meal else 0) + (60 if accom else 0) + (40 if taxi else 0)
 
         passenger, _ = Passenger.objects.get_or_create(
@@ -54,7 +62,7 @@ class TrainTripViewSet(viewsets.ReadOnlyModelViewSet):
         )
 
         return Response(
-            {"ticket_id": ticket.pk, "amount": amount},
+            {"ticket_id": ticket.pk, "amount": float(amount)},
             status=status.HTTP_201_CREATED
         )
 
@@ -74,18 +82,29 @@ class TicketViewSet(viewsets.ModelViewSet):
     def pay(self, request, pk=None):
         ticket = self.get_object()
         pm = request.data.get("payment_method")
+        
+        # Validate payment method
+        valid_methods = ['credit_card', 'check', 'cash']
         if not pm:
-            return Response({"error": "payment_method required"}, status=400)
+            return Response({"error": "payment_method required"}, status=status.HTTP_400_BAD_REQUEST)
+        if pm not in valid_methods:
+            return Response({"error": f"Invalid payment_method. Must be one of: {', '.join(valid_methods)}"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Prevent double payment
+        if ticket.paid:
+            return Response({"error": "Ticket already paid"}, status=status.HTTP_400_BAD_REQUEST)
+        
         ticket.paid = True
         ticket.payment_method = pm
         ticket.save()
         ticket.passenger.refresh_from_db()
         passenger = ticket.passenger
+        
         return Response({
-        "status": "paid",
-        "membership_points": passenger.membership_points,
-         "membership_level": passenger.membership_level.level_name if passenger.membership_level else "Bronze",
-     }, status=status.HTTP_200_OK)
+            "status": "paid",
+            "membership_points": passenger.membership_points,
+            "membership_level": passenger.membership_level.level_name if passenger.membership_level else "Bronze",
+        }, status=status.HTTP_200_OK)
 
 
 class MeView(APIView):
@@ -122,9 +141,40 @@ class SeatListCreateView(generics.GenericAPIView):
     def post(self, request, flight_id):
         seat      = request.data.get("seat_num")
         ticket_id = request.data.get("ticket_id")
-        ticket    = Ticket.objects.get(pk=ticket_id, passenger__user=request.user)
-        ticket.seat_num = seat
-        ticket.save(update_fields=["seat_num"])
+        
+        # Input validation
+        if not seat or not ticket_id:
+            return Response({"error": "seat_num and ticket_id are required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            # Use atomic transaction with row-level locking to prevent race conditions
+            with transaction.atomic():
+                # Lock the ticket for update to prevent concurrent modifications
+                ticket = Ticket.objects.select_for_update().get(
+                    pk=ticket_id, 
+                    passenger__user=request.user
+                )
+                
+                # Verify ticket belongs to the correct flight
+                if ticket.train_trip and ticket.train_trip.trip_id != flight_id:
+                    return Response({"error": "Ticket does not belong to this flight"}, status=status.HTTP_400_BAD_REQUEST)
+                
+                # Check if seat is already taken (with row locking)
+                existing_seat = Ticket.objects.select_for_update().filter(
+                    train_trip__trip_id=flight_id, 
+                    seat_num=seat
+                ).exclude(pk=ticket_id).first()
+                
+                if existing_seat:
+                    return Response({"error": "Seat already taken"}, status=status.HTTP_409_CONFLICT)
+                
+                # Assign the seat
+                ticket.seat_num = seat
+                ticket.save(update_fields=["seat_num"])
+                
+        except Ticket.DoesNotExist:
+            return Response({"error": "Ticket not found or unauthorized"}, status=status.HTTP_404_NOT_FOUND)
+        
         return Response({"status": "seat assigned"})
 
 class NotificationViewSet(viewsets.ReadOnlyModelViewSet):

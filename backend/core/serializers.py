@@ -18,7 +18,6 @@ class CustomRegisterSerializer(RegisterSerializer):
     email = serializers.EmailField(required=True)   
 
     def validate(self, data):
-        print("VALIDATED DATA IN REGISTER SERIALIZER:", data)
         return super().validate(data)
 
     first_name = serializers.CharField(required=False, allow_blank=True)

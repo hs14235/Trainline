@@ -4,19 +4,25 @@ services:
     image: postgres:14-alpine
     container_name: trainline-db
     environment:
-      - POSTGRES_USER=trainline_user
-      - POSTGRES_PASSWORD=trainline_pass
-      - POSTGRES_DB=trainline_db
+      # Use environment variables from .env file instead of hardcoded values
+      - POSTGRES_USER=${POSTGRES_USER:-trainline_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-trainline_pass}
+      - POSTGRES_DB=${POSTGRES_DB:-trainline_db}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+    # Remove public port exposure for production security
+    # Only expose internally to other containers
+    expose:
+      - "5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U trainline_user -d trainline_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-trainline_user} -d ${POSTGRES_DB:-trainline_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    # Add network isolation
+    networks:
+      - trainline-network
     
 
   backend:
@@ -33,29 +39,38 @@ services:
         condition: service_healthy
     container_name: trainline-backend
     environment:
-      # WARNING: These are development-only values. For production:
-      # 1. Generate a strong DJANGO_SECRET_KEY and store it securely
-      # 2. Set DJANGO_DEBUG=False
-      # 3. Update ALLOWED_HOSTS with your actual domain
-      # 4. Use Docker secrets or environment files for sensitive values
-      - DJANGO_SECRET_KEY=dev-secret-key-change-in-production
-      - DJANGO_DEBUG=True
-      - ALLOWED_HOSTS=0.0.0.0,127.0.0.1,localhost
-      - DATABASE_URL=postgresql://trainline_user:trainline_pass@db:5432/trainline_db
+      # SECURITY: These are development defaults. For production:
+      # 1. Create a .env file with secure values (see .env.example)
+      # 2. Use Docker secrets or a secrets manager
+      # 3. Never commit production secrets to git
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:-dev-secret-key-CHANGE-THIS-IN-PRODUCTION}
+      - DJANGO_DEBUG=${DJANGO_DEBUG:-False}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-trainline_user}:${POSTGRES_PASSWORD:-trainline_pass}@db:5432/${POSTGRES_DB:-trainline_db}
       - SPECTACULAR_TITLE=Trainline API
       - SPECTACULAR_VERSION=1.0.0
     restart: unless-stopped
+    networks:
+      - trainline-network
 
   frontend:
     build: 
       context: .
       dockerfile: frontend/Dockerfile
+      args:
+        - REACT_APP_API_BASE=${REACT_APP_API_BASE:-http://localhost:8000}
     container_name: trainline-frontend
     depends_on:
       - backend
     ports:
       - "3000:80"
     restart: unless-stopped
+    networks:
+      - trainline-network
 
 volumes:
   postgres_data:
+
+networks:
+  trainline-network:
+    driver: bridge

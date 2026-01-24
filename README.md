@@ -73,6 +73,29 @@ Frontend
 
 ---
 
+## 🔒 Security & Production Deployment
+
+This application has undergone a comprehensive security audit. For production deployment:
+
+- **[SECURITY.md](SECURITY.md)** - Security audit report, vulnerabilities fixed, and best practices
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Step-by-step production deployment guide with Docker
+
+### Quick Production Setup
+```bash
+# Generate secure secret key
+python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'
+
+# Create .env file with production values
+cp .env.production.example .env
+
+# Deploy with Docker Compose
+docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+**⚠️ Important:** Never use default credentials in production. See SECURITY.md for full checklist.
+
+---
+
 ## Credits
 - Built for **CSCI 3321 - Database Systems & potential employers for insight on improvement**
 - Thanks a lot to **Dr. Weitian Tong** for succint teaching with good sources of practice via website 

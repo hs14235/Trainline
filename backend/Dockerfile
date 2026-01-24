@@ -11,4 +11,8 @@ RUN mkdir -p /app/staticfiles
 
 COPY . .
 
-CMD ["sh", "-c", "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"]
+# Make entrypoint script executable
+RUN chmod +x /app/entrypoint.sh
+
+# Use entrypoint script for startup validation and server launch
+ENTRYPOINT ["/app/entrypoint.sh"]

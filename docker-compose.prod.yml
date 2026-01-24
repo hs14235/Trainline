@@ -1,0 +1,39 @@
+version: "3.9"
+
+# Production Docker Compose Configuration
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# IMPORTANT: Before deploying to production:
+# 1. Create a .env file with secure values (DO NOT commit to git)
+# 2. Generate a strong DJANGO_SECRET_KEY: python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'
+# 3. Set DJANGO_DEBUG=False
+# 4. Configure ALLOWED_HOSTS with your domain
+# 5. Use strong database credentials
+# 6. Enable HTTPS/SSL termination (e.g., with nginx reverse proxy)
+
+services:
+  db:
+    # Remove port exposure - database only accessible from backend
+    ports: []
+    environment:
+      # Override with production credentials from .env file
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+  
+  backend:
+    volumes: []  # Don't mount source code in production
+    environment:
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+      - DJANGO_DEBUG=False
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      # Additional production settings
+      - SECURE_SSL_REDIRECT=True
+      - SESSION_COOKIE_SECURE=True
+      - CSRF_COOKIE_SECURE=True
+  
+  frontend:
+    build:
+      args:
+        - REACT_APP_API_BASE=${REACT_APP_API_BASE}
