@@ -1,31 +1,31 @@
-# Django Framework - Updated to latest secure version
-Django>=4.2.24,<4.3
-djangorestframework>=3.14,<3.15
+# Django 5.2.x ecosystem
+Django>=5.2,<5.3
+djangorestframework>=3.16,<3.17
 
 # Authentication & Authorization
-dj-rest-auth>=5.0,<6.0
-django-allauth>=0.57,<0.58
+dj-rest-auth>=7.0,<8.0
+django-allauth>=65.0,<66.0
 
 # Database
 psycopg2-binary>=2.9,<3.0
 
 # CORS handling
-django-cors-headers>=4.3,<5.0
+django-cors-headers>=4.9,<5.0
 
 # API Documentation
-drf-spectacular>=0.27,<0.28
+drf-spectacular>=0.29,<0.30
 
-# Production Server - Updated to latest secure version
-gunicorn>=22.0,<23.0
+# Production Server
+gunicorn>=23.0,<24.0
 
 # Static files
-whitenoise>=6.6,<7.0
+whitenoise>=6.11,<7.0
 
 # Environment variables
-django-environ>=0.11,<0.12
+django-environ>=0.12,<0.13
 
-# JWT (if needed for future token-based auth)
-djangorestframework-simplejwt>=5.3,<6.0
+# JWT for token-based auth
+djangorestframework-simplejwt>=5.5,<6.0
 
-# HTTP requests (used in views)
-requests>=2.31,<3.0
+# HTTP requests
+requests>=2.32,<3.0
