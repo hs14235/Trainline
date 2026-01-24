@@ -11,8 +11,8 @@ RUN mkdir -p /app/staticfiles
 
 COPY . .
 
-# Collect static files
-RUN python manage.py collectstatic --noinput --clear || true
+# Make entrypoint script executable
+RUN chmod +x /app/entrypoint.sh
 
-# Use Gunicorn for production instead of runserver
-CMD ["sh", "-c", "python manage.py migrate && gunicorn booking.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 60"]
+# Use entrypoint script for startup validation and server launch
+ENTRYPOINT ["/app/entrypoint.sh"]

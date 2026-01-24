@@ -1,4 +1,5 @@
 from django.utils import timezone       
+from django.db import transaction
 from requests import request
 from rest_framework import status, viewsets, generics, permissions
 from rest_framework.decorators import action
@@ -61,7 +62,7 @@ class TrainTripViewSet(viewsets.ReadOnlyModelViewSet):
         )
 
         return Response(
-            {"ticket_id": ticket.pk, "amount": str(amount)},
+            {"ticket_id": ticket.pk, "amount": float(amount)},
             status=status.HTTP_201_CREATED
         )
 
@@ -146,25 +147,34 @@ class SeatListCreateView(generics.GenericAPIView):
             return Response({"error": "seat_num and ticket_id are required"}, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            ticket = Ticket.objects.get(pk=ticket_id, passenger__user=request.user)
+            # Use atomic transaction with row-level locking to prevent race conditions
+            with transaction.atomic():
+                # Lock the ticket for update to prevent concurrent modifications
+                ticket = Ticket.objects.select_for_update().get(
+                    pk=ticket_id, 
+                    passenger__user=request.user
+                )
+                
+                # Verify ticket belongs to the correct flight
+                if ticket.train_trip and ticket.train_trip.trip_id != flight_id:
+                    return Response({"error": "Ticket does not belong to this flight"}, status=status.HTTP_400_BAD_REQUEST)
+                
+                # Check if seat is already taken (with row locking)
+                existing_seat = Ticket.objects.select_for_update().filter(
+                    train_trip__trip_id=flight_id, 
+                    seat_num=seat
+                ).exclude(pk=ticket_id).first()
+                
+                if existing_seat:
+                    return Response({"error": "Seat already taken"}, status=status.HTTP_409_CONFLICT)
+                
+                # Assign the seat
+                ticket.seat_num = seat
+                ticket.save(update_fields=["seat_num"])
+                
         except Ticket.DoesNotExist:
             return Response({"error": "Ticket not found or unauthorized"}, status=status.HTTP_404_NOT_FOUND)
         
-        # Verify ticket belongs to the correct flight
-        if ticket.train_trip and ticket.train_trip.trip_id != flight_id:
-            return Response({"error": "Ticket does not belong to this flight"}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Check if seat is already taken (race condition protection)
-        existing_seat = Ticket.objects.filter(
-            train_trip__trip_id=flight_id, 
-            seat_num=seat
-        ).exclude(pk=ticket_id).first()
-        
-        if existing_seat:
-            return Response({"error": "Seat already taken"}, status=status.HTTP_409_CONFLICT)
-        
-        ticket.seat_num = seat
-        ticket.save(update_fields=["seat_num"])
         return Response({"status": "seat assigned"})
 
 class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
