@@ -26,10 +26,10 @@ This project was built independently for deployment onto the public domain for p
 ---
 
 ## Screenshots
-![Login](docs/traindemo-login.jpg)
-![Signup](docs/traindemo-signup.jpg)
-![Book a Trip](docs/tripdemo-booking.jpg)
-![Payment](docs/traindemopayment.jpg)
+![Login](backend/docs/traindemo-login.jpg)
+![Signup](backend/docs/traindemo-signup.jpg)
+![Book a Trip](backend/docs/tripdemo-booking.jpg)
+![Payment](backend/docs/traindemopayment.jpg)
 
 
 
