@@ -2,7 +2,7 @@
 
 
 ## Demo
-![Trainline Demo](docs/Trainline-GIF.gif)
+![Trainline Demo](backend/docs/Trainline-GIF.gif)
 
 
 ---
