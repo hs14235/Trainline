@@ -96,11 +96,7 @@ docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 ---
 
-## Credits
-- Built for **CSCI 3321 - Database Systems & potential employers for insight on improvement**
-- Thanks a lot to **Dr. Weitian Tong** for succint teaching with good sources of practice via website 
 
----
 
 ## License
 This project is licensed under the [MIT License](LICENSE).
