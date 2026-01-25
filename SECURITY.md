@@ -1,6 +1,6 @@
 # Security & Production Deployment Guide
 
-## 🔒 Security Fixes Applied
+## Security Fixes Applied
 
 This document outlines the security improvements made to the Trainline application and provides guidance for secure production deployment.
 
@@ -8,7 +8,7 @@ This document outlines the security improvements made to the Trainline applicati
 
 ## Critical Security Fixes
 
-### 1. ✅ Removed Hardcoded Credentials
+### 1. Removed Hardcoded Credentials
 **Issue**: Database passwords and Django secret key were hardcoded in `docker-compose.yml`
 
 **Fix**:
@@ -31,7 +31,7 @@ nano .env
 
 ---
 
-### 2. ✅ Fixed Debug Mode Configuration
+### 2. Fixed Debug Mode Configuration
 **Issue**: `DJANGO_DEBUG=True` was set in docker-compose.yml
 
 **Fix**:
@@ -46,7 +46,7 @@ grep DJANGO_DEBUG docker-compose.yml
 
 ---
 
-### 3. ✅ Fixed Seat Assignment Authorization Vulnerability
+### 3. Fixed Seat Assignment Authorization Vulnerability
 **Issue**: Any authenticated user could assign seats to any ticket by guessing ticket IDs
 
 **Fix** (`backend/core/views.py`):
@@ -65,7 +65,7 @@ curl -X POST http://localhost:8000/api/seats/FL123/ \
 
 ---
 
-### 4. ✅ Removed Debug Print Statement
+### 4. Removed Debug Print Statement
 **Issue**: Password and sensitive data logged to console in `serializers.py`
 
 **Fix**:
@@ -73,7 +73,7 @@ curl -X POST http://localhost:8000/api/seats/FL123/ \
 
 ---
 
-### 5. ✅ Replaced Development Server with Gunicorn
+### 5. Replaced Development Server with Gunicorn
 **Issue**: Using `python manage.py runserver` in production (single-threaded, debug-enabled)
 
 **Fix** (`backend/Dockerfile`):
@@ -83,7 +83,7 @@ curl -X POST http://localhost:8000/api/seats/FL123/ \
 
 ---
 
-### 6. ✅ Added Security Headers
+### 6. Added Security Headers
 
 **Backend** (`backend/booking/settings.py`):
 - `SECURE_HSTS_SECONDS = 31536000` (1 year)
@@ -103,7 +103,7 @@ curl -X POST http://localhost:8000/api/seats/FL123/ \
 
 ---
 
-### 7. ✅ Pinned Dependency Versions
+### 7. Pinned Dependency Versions
 **Issue**: Unpinned dependencies could introduce vulnerabilities
 
 **Fix** (`requirements.txt`):
@@ -122,7 +122,7 @@ pip-audit
 
 ---
 
-### 8. ✅ Enhanced Input Validation
+### 8. Enhanced Input Validation
 
 **Payment Endpoint** (`backend/core/views.py`):
 - Validate payment method against whitelist
@@ -135,7 +135,7 @@ pip-audit
 
 ---
 
-## 🚨 Remaining Considerations
+## Remaining Considerations
 
 ### Token Storage (Medium Priority)
 **Current**: Auth tokens stored in localStorage (vulnerable to XSS)
@@ -168,7 +168,7 @@ REST_FRAMEWORK = {
 
 ---
 
-## 🚀 Production Deployment Checklist
+## Production Deployment Checklist
 
 ### Pre-Deployment
 
@@ -208,7 +208,7 @@ docker exec trainline-backend python manage.py check --deploy
 
 ---
 
-## 🔐 Security Best Practices
+## Security Best Practices
 
 ### 1. Secrets Management
 - Never commit secrets to git
@@ -241,7 +241,7 @@ docker exec trainline-backend python manage.py check --deploy
 
 ---
 
-## 📞 Security Incident Response
+## Security Incident Response
 
 If you discover a security vulnerability:
 
@@ -255,7 +255,7 @@ If you discover a security vulnerability:
 
 ---
 
-## 🛠️ Useful Commands
+## Useful Commands
 
 ```bash
 # Generate Django secret key
@@ -280,7 +280,7 @@ curl -I https://yourdomain.com | grep -E "(X-Frame|X-Content|Strict-Transport)"
 
 ---
 
-## 📚 Additional Resources
+## Additional Resources
 
 - [Django Security Checklist](https://docs.djangoproject.com/en/stable/topics/security/)
 - [OWASP Top 10](https://owasp.org/www-project-top-ten/)
