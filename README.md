@@ -9,7 +9,7 @@
 
 
 ## Overview
-Trainline is a full-stack project built with **Django (backend)**, **React (frontend)**, and **PostgreSQL (database)**.  
+Trainline is a full-stack project with MVC pattern for a complete SDLC built with **Django (backend)**, **React (frontend)**, and **PostgreSQL (database)**.  
 It allows users to register, log in, browse train trips, book tickets, select seats, interact with chatbox and make payments with in-house UI implementations.  
 This project was built independently for deployment onto the public domain for practical understanding of system design. 
 
