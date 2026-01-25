@@ -1,4 +1,4 @@
-    # 🚆 Trainline 
+    # Trainline 
 
 
 ## Demo
@@ -73,7 +73,7 @@ Frontend
 
 ---
 
-## 🔒 Security & Production Deployment
+## Security & Production Deployment
 
 This application has undergone a comprehensive security audit. For production deployment:
 
@@ -92,7 +92,7 @@ cp .env.production.example .env
 docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 ```
 
-**⚠️ Important:** Never use default credentials in production. See SECURITY.md for full checklist.
+** Important:** Never use default credentials in production. See SECURITY.md for full checklist.
 
 ---
 
