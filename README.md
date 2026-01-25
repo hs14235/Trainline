@@ -1,7 +1,6 @@
-    # Trainline 
 
 
-## Demo
+## Welcome to Trainline!
 ![Trainline Demo](backend/docs/Trainline-GIF.gif)
 
 
