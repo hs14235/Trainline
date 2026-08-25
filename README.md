@@ -8,10 +8,29 @@
 
 
 ## Overview
-Trainline is a full-stack project with MVC pattern for a complete SDLC built with **Django (backend)**, **React (frontend)**, and **PostgreSQL (database)**.  
-It allows users to register, log in, browse train trips, book tickets, select seats, interact with chatbox and make payments with in-house UI implementations.  
-This project was built independently for deployment onto the public domain for practical understanding of system design. 
 
+Trainline is an independently developed full-stack train-booking platform built with
+React, Django REST Framework, PostgreSQL, and Docker.
+
+The application supports end-to-end workflows for authentication, trip discovery,
+seat selection, booking, payment validation, notifications, and in-app chat. Its
+architecture separates the frontend, REST API, and relational database into
+independently containerized services, with environment-based configuration and
+production-oriented security controls.
+
+The project was built to deepen hands-on experience across API design, relational
+data modeling, frontend/backend integration, security hardening, containerized
+deployment, and the end-to-end software development lifecycle.
+---
+## Engineering Highlights
+
+- Containerized frontend, backend, and PostgreSQL services
+- Relational models for users, trips, tickets, seating, and payments
+- Authentication and authorization controls
+- Input validation and API boundary protections
+- Environment-based secret management
+- Security headers and HTTPS-oriented production settings
+- Documented Docker production deployment
 ---
 
 ## Features
@@ -45,13 +64,24 @@ This project was built independently for deployment onto the public domain for p
 
 ---
 
-##  Tech Stack
-- **Frontend**: React (JSX, CSS)
-- **Backend**: Django (REST Framework)
-- **Database**: PostgreSQL
-- **Other**: DRF Token/Session Authentication, Axios
+## Tech Stack
+
+- **Frontend:** React, JavaScript, CSS, Axios
+- **Backend:** Django, Django REST Framework
+- **Database:** PostgreSQL
+- **Authentication:** Django REST authentication / token and session authentication
+- **Infrastructure:** Docker, Docker Compose
 
 ---
+
+## Architecture
+
+React Client
+    ↓ REST
+Django REST Framework
+    ↓ ORM
+PostgreSQL
+
 
 ## Local Setup & Installation [POWERSHELL]
 Backend 
