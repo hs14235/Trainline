@@ -48,8 +48,8 @@ This project was built independently for deployment onto the public domain for p
 ##  Tech Stack
 - **Frontend**: React (JSX, CSS)
 - **Backend**: Django (REST Framework)
-- **Database**: MySQL
-- **Other**: JWT Authentication, Axios
+- **Database**: PostgreSQL
+- **Other**: DRF Token/Session Authentication, Axios
 
 ---
 
