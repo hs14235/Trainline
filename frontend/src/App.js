@@ -1,108 +1,140 @@
-import React from 'react';
-import { Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Home from './Home';
-import Flights from './Flights';
-import BookFlight from './pages/BookFlight';
-import PaymentPage from './pages/PaymentPage';
-import SeatSelect from './pages/SeatSelect';
-import ChatWidget from './components/ChatWidget';
-import NotificationWidget from "./components/NotificationWidget";
-import { Tooltip } from 'react-tooltip';
-import 'react-tooltip/dist/react-tooltip.css';
 import './App.css';
+import ChatWidget from './components/ChatWidget';
+import NotificationWidget from './components/NotificationWidget';
+import ServiceStatus from './components/ServiceStatus';
+import Flights from './Flights';
+import Home from './Home';
+import BookFlight from './pages/BookFlight';
+import Engineering from './pages/Engineering';
+import Login from './pages/Login';
+import PaymentPage from './pages/PaymentPage';
+import Register from './pages/Register';
+import SeatSelect from './pages/SeatSelect';
+
+function ProtectedRoute({ authenticated, children }) {
+  return authenticated ? children : <Navigate to="/login" replace />;
+}
+
+function RouteFrame({ children }) {
+  const location = useLocation();
+  const mainRef = useRef(null);
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    mainRef.current?.focus({ preventScroll: true });
+  }, [location.pathname]);
+
+  return (
+    <main id="main-content" className="app-main" ref={mainRef} tabIndex="-1">
+      {children}
+    </main>
+  );
+}
 
 export default function App() {
-  const token = !!localStorage.getItem('token');
+  const [authenticated, setAuthenticated] = useState(() => Boolean(localStorage.getItem('token')));
   const navigate = useNavigate();
+
+  const navClassName = ({ isActive }) => 'nav-link' + (isActive ? ' nav-link--active' : '');
+
+  const handleAuthenticated = (token) => {
+    localStorage.setItem('token', token);
+    setAuthenticated(true);
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
-    navigate('/');          
+    setAuthenticated(false);
+    navigate('/login');
   };
 
+  const protect = (element) => (
+    <ProtectedRoute authenticated={authenticated}>{element}</ProtectedRoute>
+  );
+
   return (
-    <>
-      <nav className="navbar">
-        <div className="navbar-brand">Trainline</div>
+    <div className="app-shell">
+      <a className="skip-link" href="#main-content">
+        Skip to main content
+      </a>
+      <header className="site-header">
+        <Link className="brand" to={authenticated ? '/' : '/login'} aria-label="Trainline home">
+          <span className="brand__rail" aria-hidden="true" />
+          <span>Trainline</span>
+        </Link>
 
-        <div className="navbar-links">
-          {token ? (
+        <nav className="primary-nav" aria-label="Primary navigation">
+          {authenticated ? (
             <>
-              <Link
-                to="/"
-                className="nav-link"
-                data-tip="Go to dashboard"
-                data-tooltip-id="main-tip"
-              >
-                Home
-              </Link>
-
-              <Link
-                to="/flights"
-                className="nav-link"
-                data-tip="Browse and book"
-                data-tooltip-id="main-tip"
-              >
-                Available Trains
-              </Link>
-
-              <button
-                className="nav-link"
-                data-tip="Log out"
-                data-tooltip-id="main-tip"
-                onClick={handleLogout}
-              >
-                Log Out
+              <NavLink to="/" end className={navClassName}>
+                Dashboard
+              </NavLink>
+              <NavLink to="/flights" className={navClassName}>
+                Find trains
+              </NavLink>
+              <NavLink to="/engineering" className={navClassName}>
+                Engineering
+              </NavLink>
+              <button className="nav-link nav-link--button" onClick={handleLogout}>
+                Log out
               </button>
             </>
           ) : (
             <>
-              <Link
-                to="/register"
-                className="nav-link"
-                data-tip="Create an account"
-                data-tooltip-id="main-tip"
-              >
-                Register
-              </Link>
-
-              <Link
-                to="/login"
-                className="nav-link"
-                data-tip="Sign in"
-                data-tooltip-id="main-tip"
-              >
-                Log In
-              </Link>
+              <NavLink to="/engineering" className={navClassName}>
+                Engineering
+              </NavLink>
+              <NavLink to="/register" className={navClassName}>
+                Create account
+              </NavLink>
+              <NavLink to="/login" className={navClassName}>
+                Log in
+              </NavLink>
             </>
           )}
-        </div>
-      </nav>
+        </nav>
+      </header>
 
-      <div className="container">
+      <RouteFrame>
         <Routes>
-          <Route path="/" element={token ? <Home /> : <Navigate to="/login" replace />} />
-          <Route path="/login" element={token ? <Navigate to="/" replace /> : <Login />} />
-          <Route path="/register" element={token ? <Navigate to="/" replace /> : <Register />} />
-
-          <Route path="/trips"   element={token ? <Flights /> : <Navigate to="/login" replace />} />
-          <Route path="/flights" element={token ? <Flights /> : <Navigate to="/login" replace />} />
-
-          <Route path="/book/:flightId" element={token ? <BookFlight /> : <Navigate to="/login" replace />} />
-          <Route path="/select-seat/:ticketId" element={token ? <SeatSelect /> : <Navigate to="/login" replace />} />
-          <Route path="/payment/:ticketId" element={token ? <PaymentPage /> : <Navigate to="/login" replace />} />
-
-          <Route path="*" element={<Navigate to={token ? '/' : '/login'} replace />} />
+          <Route path="/engineering" element={<Engineering />} />
+          <Route path="/" element={protect(<Home />)} />
+          <Route
+            path="/login"
+            element={
+              authenticated ? (
+                <Navigate to="/" replace />
+              ) : (
+                <Login onAuthenticated={handleAuthenticated} />
+              )
+            }
+          />
+          <Route
+            path="/register"
+            element={authenticated ? <Navigate to="/" replace /> : <Register />}
+          />
+          <Route path="/trips" element={protect(<Flights />)} />
+          <Route path="/flights" element={protect(<Flights />)} />
+          <Route path="/book/:flightId" element={protect(<BookFlight />)} />
+          <Route path="/select-seat/:ticketId" element={protect(<SeatSelect />)} />
+          <Route path="/payment/:ticketId" element={protect(<PaymentPage />)} />
+          <Route path="*" element={<Navigate to={authenticated ? '/' : '/login'} replace />} />
         </Routes>
-      </div>
+      </RouteFrame>
 
-      {token && <ChatWidget />}
-      {token && <NotificationWidget />}
+      <footer className="site-footer">
+        <div>
+          <strong>Trainline engineering demo</strong>
+          <span>React · Django REST · PostgreSQL</span>
+        </div>
+        <ServiceStatus />
+      </footer>
 
-      <Tooltip id="main-tip" place="top" effect="solid" style={{ backgroundColor: "#333", color: "#fff" }} /> 
-    </>
+      {authenticated && <NotificationWidget />}
+      {authenticated && <ChatWidget />}
+    </div>
   );
 }

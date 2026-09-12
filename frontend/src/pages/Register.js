@@ -1,13 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import api from '../api';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+
+import api, { describeApiError } from '../api';
+import StatusPanel from '../components/StatusPanel';
 
 export default function Register() {
-  const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
-  const [password1, setPassword1] = useState('');
-  const [password2, setPassword2] = useState('');
+  const [form, setForm] = useState({
+    username: '',
+    email: '',
+    password1: '',
+    password2: '',
+  });
   const [error, setError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -15,60 +20,131 @@ export default function Register() {
     return () => document.body.classList.remove('bg-register');
   }, []);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError(null);
+  const updateField = (event) => {
+    setForm((current) => ({ ...current, [event.target.name]: event.target.value }));
+  };
 
-    if (password1 !== password2) {
-      setError("Passwords don't match");
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (submitting) return;
+
+    if (!form.username.trim() || !form.email.trim() || !form.password1 || !form.password2) {
+      setError({ title: 'Complete every field', message: 'All account fields are required.' });
+      return;
+    }
+    if (form.password1 !== form.password2) {
+      setError({ title: 'Passwords do not match', message: 'Re-enter the same password in both fields.' });
+      return;
+    }
+    if (form.password1.length < 8) {
+      setError({ title: 'Use a longer password', message: 'Passwords must contain at least 8 characters.' });
       return;
     }
 
+    setSubmitting(true);
+    setError(null);
     try {
-
       await api.post('/dj-rest-auth/registration/', {
-        username,
-        email,
-        password1,
-        password2,
+        username: form.username.trim(),
+        email: form.email.trim(),
+        password1: form.password1,
+        password2: form.password2,
       });
-
-      navigate('/login');
-    } catch (err) {
-      const data = err.response?.data;
-      const msg = data
-        ? Object.entries(data)
-            .map(([field, msgs]) =>
-              Array.isArray(msgs) ? `${field}: ${msgs.join(', ')}` : `${field}: ${msgs}`
-            )
-            .join('\n')
-        : err.message;
-      setError(msg);
+      navigate('/login', {
+        replace: true,
+        state: { message: 'Your local account is ready. Sign in to continue.' },
+      });
+    } catch (requestError) {
+      setError(describeApiError(requestError, 'The account could not be created.'));
+    } finally {
+      setSubmitting(false);
     }
   };
 
   return (
-    <form noValidate onSubmit={handleSubmit} className="signup-container">
-      <h2>Register</h2>
-      {error && <pre style={{ color:'crimson', whiteSpace:'pre-wrap' }}>{error}</pre>}
+    <div className="auth-layout">
+      <section className="auth-intro" aria-labelledby="register-heading">
+        <p className="eyebrow">Local account setup</p>
+        <h1 id="register-heading">Create your Trainline account</h1>
+        <p>
+          Registration uses the existing Django authentication contract. Never reuse a real password
+          in this portfolio demo.
+        </p>
+      </section>
 
-      <label>Username
-        <input type="text" value={username} required onChange={e => setUsername(e.target.value)} />
-      </label>
+      <form className="auth-card surface" noValidate onSubmit={handleSubmit}>
+        <div>
+          <p className="eyebrow">Required details</p>
+          <h2>Create account</h2>
+          <p className="form-help">All fields stay within the locally configured application.</p>
+        </div>
 
-      <label>Email
-        <input type="email" value={email} required onChange={e => setEmail(e.target.value)} />
-      </label>
+        {error && <StatusPanel title={error.title} message={error.message} variant="error" />}
 
-      <label>Password
-        <input type="password" value={password1} required onChange={e => setPassword1(e.target.value)} />
-      </label>
+        <div className="form-field">
+          <label htmlFor="register-username">Username</label>
+          <input
+            id="register-username"
+            name="username"
+            type="text"
+            autoComplete="username"
+            value={form.username}
+            onChange={updateField}
+            disabled={submitting}
+            required
+          />
+        </div>
+        <div className="form-field">
+          <label htmlFor="register-email">Email</label>
+          <input
+            id="register-email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            value={form.email}
+            onChange={updateField}
+            disabled={submitting}
+            required
+          />
+        </div>
+        <div className="form-field">
+          <label htmlFor="register-password">Password</label>
+          <input
+            id="register-password"
+            name="password1"
+            type="password"
+            autoComplete="new-password"
+            aria-describedby="password-guidance"
+            value={form.password1}
+            onChange={updateField}
+            disabled={submitting}
+            required
+          />
+          <p id="password-guidance" className="field-hint">
+            Use at least 8 characters and avoid common or entirely numeric passwords.
+          </p>
+        </div>
+        <div className="form-field">
+          <label htmlFor="register-password-confirm">Confirm password</label>
+          <input
+            id="register-password-confirm"
+            name="password2"
+            type="password"
+            autoComplete="new-password"
+            value={form.password2}
+            onChange={updateField}
+            disabled={submitting}
+            required
+          />
+        </div>
 
-      <label>Confirm Password
-        <input type="password" value={password2} required onChange={e => setPassword2(e.target.value)} />
-      </label>
-
-      <button type="submit" style={{ marginTop: '1rem' }}>Register</button>
-    </form>
+        <button className="button button--large button--full" type="submit" disabled={submitting}>
+          {submitting ? 'Creating account…' : 'Create account'}
+        </button>
+        <p className="auth-switch">
+          Already registered? <Link to="/login">Log in</Link>
+        </p>
+      </form>
+    </div>
   );
 }

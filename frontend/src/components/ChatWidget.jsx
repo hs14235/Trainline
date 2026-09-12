@@ -1,80 +1,80 @@
-// src/components/ChatWidget.jsx
-import React, { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-const canned = [
-  { trigger: /ticket/i, response: "For ticket issues, please check your booking history or contact support@trainline.com." },
-  { trigger: /membership/i, response: "Membership tiers update after you complete fully‑loaded the amenities for your trip. Your current membership level is: ${membershipLevel}"  },
-  { trigger: /account/i, response: "You can update your email & password on your profile page (coming soon!)." },
-  { trigger: /.*/, response: "Sorry, currently I can only encompass a few prompts. Try 'ticket', 'membership', or 'account'." },
+const guideTopics = [
+  {
+    label: 'Tickets',
+    answer: 'Open the dashboard to review only your own tickets, payment state, options, and seat.',
+  },
+  {
+    label: 'Seats',
+    answer: 'Seat availability comes from the API. A conflict refreshes the choices without retrying the reservation.',
+  },
+  {
+    label: 'Payments',
+    answer: 'Payment is a demo-only state transition. The app never collects card details or moves money.',
+  },
 ];
 
 export default function ChatWidget() {
   const [open, setOpen] = useState(false);
-  const [msgs, setMsgs] = useState([
-    { from: 'bot', text: "Hi! How can I help today?" }
-  ]);
-  const [entry, setEntry] = useState('');
+  const [topic, setTopic] = useState(null);
+  const panelRef = useRef(null);
 
-  const send = () => {
-    if (!entry.trim()) return;
-    const you = { from: 'you', text: entry };
-    const bot = canned.find(c => c.trigger.test(entry)) || canned[canned.length - 1];
-    setMsgs([...msgs, you, { from:'bot', text: bot.response }]);
-    setEntry('');
-  };
+  useEffect(() => {
+    if (open) panelRef.current?.focus();
+  }, [open]);
 
   return (
-    <div style={{
-      position: 'fixed', bottom: 20, right: 20,
-      width: open ? 300 : 60, height: open ? 400 : 60,
-      background: '#fff', boxShadow: '0 0 8px rgba(0,0,0,0.2)',
-      borderRadius: 8, overflow: 'hidden',
-      fontFamily: 'sans-serif', transition: 'all .2s'
-    }}>
-      <div
-        onClick={() => setOpen(o => !o)}
-        style={{
-          background: '#007b5e', color: 'white',
-          height: 60, cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 24
-        }}>
-        💬
-      </div>
+    <div className="utility-widget utility-widget--guide">
       {open && (
-        <div style={{ display:'flex', flexDirection:'column', height:'calc(100% - 60px)' }}>
-          <div style={{ flex:1, padding:8, overflowY:'auto' }}>
-            {msgs.map((m,i) => (
-              <div key={i} style={{
-                textAlign: m.from==='you' ? 'right' : 'left',
-                margin: '4px 0'
-              }}>
-                <span style={{
-                  display:'inline-block',
-                  background: m.from==='you' ? '#007b5e' : '#eee',
-                  color: m.from==='you' ? 'white' : 'black',
-                  padding: '6px 10px',
-                  borderRadius: 12,
-                  maxWidth: '80%'
-                }}>
-                  {m.text}
-                </span>
-              </div>
+        <section
+          id="guide-panel"
+          className="utility-panel"
+          aria-labelledby="guide-title"
+          ref={panelRef}
+          tabIndex="-1"
+        >
+          <div className="utility-panel__header">
+            <div>
+              <p className="eyebrow">Client-only demo</p>
+              <h2 id="guide-title">Booking guide</h2>
+            </div>
+            <button className="icon-button" onClick={() => setOpen(false)} aria-label="Close booking guide">
+              ×
+            </button>
+          </div>
+          <p className="demo-disclosure">
+            This is a local FAQ guide, not live chat or authenticated support.
+          </p>
+          <div className="guide-topics" aria-label="Guide topics">
+            {guideTopics.map((item) => (
+              <button
+                key={item.label}
+                className={'button button--quiet button--small' + (topic === item.label ? ' is-active' : '')}
+                onClick={() => setTopic(item.label)}
+                aria-pressed={topic === item.label}
+              >
+                {item.label}
+              </button>
             ))}
           </div>
-          <div style={{ padding:8, borderTop:'1px solid #ddd' }}>
-            <input
-              value={entry}
-              onChange={e => setEntry(e.target.value)}
-              onKeyDown={e => e.key==='Enter' && send()}
-              placeholder="Type a message…" 
-              style={{
-                width: '100%', padding: '8px', boxSizing: 'border-box'
-              }}
-            />
+          <div className="guide-answer" role="status" aria-live="polite">
+            {topic
+              ? guideTopics.find((item) => item.label === topic)?.answer
+              : 'Choose a topic for a short explanation.'}
           </div>
-        </div>
+        </section>
       )}
+      <button
+        className="utility-trigger"
+        onClick={() => setOpen((current) => !current)}
+        aria-expanded={open}
+        aria-controls="guide-panel"
+        aria-label="Demo guide"
+      >
+        <span aria-hidden="true">?</span>
+        <span>Demo guide</span>
+      </button>
     </div>
   );
 }

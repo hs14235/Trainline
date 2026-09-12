@@ -1,113 +1,176 @@
-import React, { useState, useEffect } from "react";
-import { useParams, useNavigate }       from "react-router-dom";
-import api                              from "../api";
+import { useCallback, useEffect, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+
+import api, { describeApiError } from '../api';
+import StatusPanel, { LoadingState } from '../components/StatusPanel';
+
+const optionDefinitions = [
+  {
+    key: 'priority_boarding',
+    title: 'Sleeping coach',
+    description: 'Request the sleeping-coach option for this booking.',
+  },
+  {
+    key: 'meal',
+    title: 'Onboard meal',
+    description: 'Add the onboard meal option to the ticket.',
+  },
+  {
+    key: 'accommodation',
+    title: 'Accessible coach',
+    description: 'Request the supported accessible-coach accommodation.',
+  },
+  {
+    key: 'taxi',
+    title: 'Taxi on arrival',
+    description: 'Add the arrival taxi option recorded by this demo.',
+  },
+];
 
 export default function BookFlight() {
   const { flightId } = useParams();
-  const navigate    = useNavigate();
-
-  const [loading, setLoading]           = useState(true);
-  const [error,   setError]             = useState(null);
-  const [baseFare, setBaseFare]         = useState(0);
-
-  const [priorityBoarding, setPb]       = useState(false);
-  const [meal, setMeal]                 = useState(false);
-  const [accommodation, setAccommodation] = useState(false);
-  const [taxi, setTaxi]                 = useState(false);
-
-  const PB_FEE      = 20;
-  const MEAL_FEE    = 10;
-  const ACCOM_FEE   = 50;
-  const TAXI_FEE    = 30;
+  const navigate = useNavigate();
+  const [trip, setTrip] = useState(null);
+  const [options, setOptions] = useState({
+    priority_boarding: false,
+    meal: false,
+    accommodation: false,
+    taxi: false,
+  });
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const body = document.body;
-    body.classList.add('bg-booking');
-    return () => body.classList.remove('bg-booking');
+    document.body.classList.add('bg-booking');
+    return () => document.body.classList.remove('bg-booking');
   }, []);
 
-  useEffect(() => {
-    api.get(`/api/train-trips/${flightId}/`)
-      .then(res => {
-        setBaseFare(res.data.fare ?? 100);
-      })
-      .catch(() => setError("Couldn’t load flight info"))
-      .finally(() => setLoading(false));
+  const loadTrip = useCallback(async (signal) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await api.get('/train-trips/' + flightId + '/', { signal });
+      setTrip(response.data);
+    } catch (requestError) {
+      if (requestError?.code !== 'ERR_CANCELED') {
+        setError(describeApiError(requestError, 'Trip details could not be loaded.'));
+      }
+    } finally {
+      if (!signal?.aborted) setLoading(false);
+    }
   }, [flightId]);
 
-  const totalFare =
-    baseFare +
-    (priorityBoarding ? PB_FEE : 0) +
-    (meal             ? MEAL_FEE : 0) +
-    (accommodation    ? ACCOM_FEE : 0) +
-    (taxi             ? TAXI_FEE : 0);
+  useEffect(() => {
+    const controller = new AbortController();
+    loadTrip(controller.signal);
+    return () => controller.abort();
+  }, [loadTrip]);
 
-  const handleBook = async () => {
+  const toggleOption = (key) => {
+    setOptions((current) => ({ ...current, [key]: !current[key] }));
+  };
+
+  const handleBook = async (event) => {
+    event.preventDefault();
+    if (submitting) return;
+
+    setSubmitting(true);
+    setError(null);
     try {
-      const payload = {
-        priority_boarding: priorityBoarding,
-        meal:              meal,
-        accommodation:     accommodation,
-        taxi:              taxi,
-      };
-      const res = await api.post(`/api/train-trips/${flightId}/book/`, payload);
-      navigate(`/payment/${res.data.ticket_id}`);
-    } catch (err) {
-      console.error(err);
-      setError("Booking failed—please try again.");
+      const response = await api.post('/train-trips/' + flightId + '/book/', options);
+      navigate('/payment/' + response.data.ticket_id, {
+        state: { amount: response.data.amount, bookingCreated: true },
+      });
+    } catch (requestError) {
+      setError(describeApiError(requestError, 'The booking could not be created.'));
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  if (loading)  return <p>Loading Trainline info…</p>;
-  if (error)    return <p style={{ color: "crimson" }}>{error}</p>;
-  
+  if (loading) return <LoadingState label="Loading trip details…" />;
+  if (!trip && error) {
+    return (
+      <StatusPanel
+        title={error.title}
+        message={error.message}
+        actionLabel="Retry trip"
+        onAction={() => loadTrip()}
+      />
+    );
+  }
 
   return (
-    <div style={{ padding: "1rem" }}>
-      <h2>Book a train line #{flightId}</h2>
-      <p>Base fare: <strong>${baseFare.toFixed(2)}</strong></p>
+    <div className="page-stack booking-page">
+      <ol className="journey-steps" aria-label="Booking progress">
+        <li className="journey-steps__current" aria-current="step"><span>1</span>Options</li>
+        <li><span>2</span>Demo payment</li>
+        <li><span>3</span>Seat</li>
+      </ol>
 
-      <label style={{ display: "block", margin: "0.5rem 0" }}>
-        <input
-          type="checkbox"
-          checked={priorityBoarding}
-          onChange={() => setPb(!priorityBoarding)}
-        />{" "}
-        Sleeping coaches (+${PB_FEE})
-      </label>
+      <header className="page-heading surface surface--hero">
+        <p className="eyebrow">Service {trip.service_number || '—'}</p>
+        <h1>{trip.origin_station} <span aria-hidden="true">→</span> {trip.destination_station}</h1>
+        <p className="lede">
+          Choose supported options, then let the API create the ticket and calculate its
+          authoritative amount.
+        </p>
+      </header>
 
-      <label style={{ display: "block", margin: "0.5rem 0" }}>
-        <input
-          type="checkbox"
-          checked={meal}
-          onChange={() => setMeal(!meal)}
-        />{" "}
-        Onboard meal (+${MEAL_FEE})
-      </label>
+      <form className="booking-layout" onSubmit={handleBook}>
+        <section className="surface" aria-labelledby="options-heading">
+          <div className="section-intro section-intro--compact">
+            <div>
+              <p className="eyebrow">Step 1</p>
+              <h2 id="options-heading">Trip options</h2>
+            </div>
+          </div>
+          <div className="option-grid">
+            {optionDefinitions.map((option) => (
+              <label
+                className={'option-card' + (options[option.key] ? ' option-card--selected' : '')}
+                key={option.key}
+              >
+                <input
+                  type="checkbox"
+                  checked={options[option.key]}
+                  onChange={() => toggleOption(option.key)}
+                  disabled={submitting}
+                />
+                <span className="option-card__control" aria-hidden="true">✓</span>
+                <span>
+                  <strong>{option.title}</strong>
+                  <small>{option.description}</small>
+                </span>
+              </label>
+            ))}
+          </div>
+        </section>
 
-      <label style={{ display: "block", margin: "0.5rem 0" }}>
-        <input
-          type="checkbox"
-          checked={accommodation}
-          onChange={() => setAccommodation(!accommodation)}
-        />{" "}
-        Accessible coaches (+${ACCOM_FEE})
-      </label>
-
-      <label style={{ display: "block", margin: "0.5rem 0" }}>
-        <input
-          type="checkbox"
-          checked={taxi}
-          onChange={() => setTaxi(!taxi)}
-        />{" "}
-        Taxi on arrival (+${TAXI_FEE})
-      </label>
-
-      <h3>Total: ${totalFare.toFixed(2)}</h3>
-
-      <button onClick={handleBook}>
-        Confirm &amp; Proceed to Payment
-      </button>
+        <aside className="surface booking-review" aria-labelledby="review-heading">
+          <p className="eyebrow">Review</p>
+          <h2 id="review-heading">Create this booking</h2>
+          <dl>
+            <div><dt>Service</dt><dd>{trip.service_number || '—'}</dd></div>
+            <div><dt>Status</dt><dd>{trip.status || 'Not provided'}</dd></div>
+            <div><dt>Platform</dt><dd>{trip.platform || 'TBA'}</dd></div>
+            <div>
+              <dt>Options</dt>
+              <dd>{Object.values(options).filter(Boolean).length || 'None'}</dd>
+            </div>
+          </dl>
+          <div className="server-price-note">
+            <strong>Server-calculated total</strong>
+            <p>The final amount is returned after ticket creation. This page does not calculate it.</p>
+          </div>
+          {error && <StatusPanel title={error.title} message={error.message} variant="error" />}
+          <button className="button button--accent button--large button--full" type="submit" disabled={submitting}>
+            {submitting ? 'Creating booking…' : 'Create booking'}
+          </button>
+          <Link className="text-link" to="/flights">Back to train results</Link>
+        </aside>
+      </form>
     </div>
   );
 }

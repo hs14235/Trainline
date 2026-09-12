@@ -2,6 +2,7 @@ import { useState } from "react";
 import api from "../api";
 
 export default function Register() {
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password1, setPassword1] = useState("");
   const [password2, setPassword2] = useState("");
@@ -17,6 +18,7 @@ export default function Register() {
 
       // 2) register user
       await api.post("/dj-rest-auth/registration/", {
+        username,
         email,
         password1,
         password2,
@@ -24,8 +26,8 @@ export default function Register() {
 
       // 3) login to get token; store for future API calls
       const login = await api.post("/dj-rest-auth/login/", {
-        email,
-        password,
+        username,
+        password: password1,
       });
       localStorage.setItem("token", login.data.key);
 
@@ -43,6 +45,9 @@ export default function Register() {
   return (
     <form onSubmit={handleRegister} style={{ maxWidth: 420 }}>
       <h2>Register</h2>
+      <label>Username</label>
+      <input value={username} onChange={(e) => setUsername(e.target.value)} />
+
       <label>Email</label>
       <input value={email} onChange={(e) => setEmail(e.target.value)} />
 

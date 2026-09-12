@@ -1,74 +1,127 @@
-import React, { useEffect, useState } from "react";
-import api from "../api";
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+import api, { describeApiError } from '../api';
 
 export default function NotificationWidget() {
   const [notes, setNotes] = useState([]);
   const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const panelRef = useRef(null);
 
-  useEffect(() => {
-    api.get("notifications/")
-       .then(res => setNotes(res.data))
-       .catch(console.error);
+  const loadNotifications = useCallback(async (signal) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await api.get('/notifications/', { signal });
+      setNotes(response.data);
+    } catch (requestError) {
+      if (requestError?.code !== 'ERR_CANCELED') {
+        setError(describeApiError(requestError, 'Notifications could not be loaded.'));
+      }
+    } finally {
+      if (!signal?.aborted) setLoading(false);
+    }
   }, []);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    loadNotifications(controller.signal);
+    return () => controller.abort();
+  }, [loadNotifications]);
+
+  useEffect(() => {
+    if (open) panelRef.current?.focus();
+  }, [open]);
+
+  const markRead = async (notificationId) => {
+    const current = notes.find((note) => note.notification_id === notificationId);
+    if (!current || current.read_status === 'read') return;
+    try {
+      await api.post('/notifications/' + notificationId + '/mark_read/');
+      setNotes((items) =>
+        items.map((note) =>
+          note.notification_id === notificationId ? { ...note, read_status: 'read' } : note
+        )
+      );
+    } catch (requestError) {
+      setError(describeApiError(requestError, 'The notification could not be marked as read.'));
+    }
+  };
+
+  const unreadCount = notes.filter((note) => note.read_status !== 'read').length;
+
   return (
-    <div style={{
-      position: "fixed",
-      bottom: 20,
-      left: 20,
-      width: open ? 300 : 60,
-      height: open ? 400 : 60,
-      background: "rgba(255, 255, 255, 0.95)",
-      boxShadow: "0 0 8px rgba(0, 0, 0, 0.2)",
-      color: "#333",
-      borderRadius: 8,
-      overflow: "hidden",
-      fontFamily: "sans-serif",
-      transition: "all .2s ease"
-    }}>
-      <div
-        onClick={() => setOpen(o => !o)}
-        style={{
-          background: "linear-gradient(135deg, #0fb77a, #0b4a6f)",
-          color: "white",
-          height: 60,
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 24,
-          transition: "filter .15s ease"
-        }}
-        onMouseEnter={(e) => e.currentTarget.style.filter = "brightness(1.1)"}
-        onMouseLeave={(e) => e.currentTarget.style.filter = "brightness(1)"}
-      >
-        🔔
-      </div>
+    <div className="utility-widget utility-widget--notifications">
       {open && (
-        <div style={{
-          padding: 12,
-          height: "calc(100% - 60px)",
-          overflowY: "auto"
-        }}>
-          <h4 style={{ margin: "0 0 12px 0" }}>Notifications</h4>
-          {notes.length === 0
-            ? <p style={{ color: "#666" }}>No new notifications</p>
-            : notes.map(n => (
-                <div key={n.notification_id} style={{
-                  marginBottom: 12,
-                  padding: 8,
-                  background: "#f5f5f5",
-                  borderRadius: 6
-                }}>
-                  <small style={{ color: "#888" }}>
-                    {new Date(n.sent_date).toLocaleString()}
-                  </small>
-                  <p style={{ margin: "4px 0 0 0" }}>{n.message}</p>
-                </div>
-              ))
-          }
-        </div>
+        <section
+          id="notifications-panel"
+          className="utility-panel"
+          aria-labelledby="notifications-title"
+          ref={panelRef}
+          tabIndex="-1"
+        >
+          <div className="utility-panel__header">
+            <div>
+              <p className="eyebrow">Account updates</p>
+              <h2 id="notifications-title">Notifications</h2>
+            </div>
+            <button className="icon-button" onClick={() => setOpen(false)} aria-label="Close notifications">
+              ×
+            </button>
+          </div>
+          {loading ? (
+            <p role="status">Loading notifications…</p>
+          ) : error ? (
+            <div className="widget-error" role="alert">
+              <strong>{error.title}</strong>
+              <p>{error.message}</p>
+              {error.canRetry && (
+                <button className="button button--small" onClick={() => loadNotifications()}>
+                  Retry
+                </button>
+              )}
+            </div>
+          ) : notes.length === 0 ? (
+            <p className="widget-empty">No notifications for this account.</p>
+          ) : (
+            <ul className="notification-list">
+              {notes.map((note) => {
+                const unread = note.read_status !== 'read';
+                return (
+                  <li className={unread ? 'notification notification--unread' : 'notification'} key={note.notification_id}>
+                    <div>
+                      <span className="status-chip status-chip--compact">
+                        {unread ? 'Unread' : 'Read'}
+                      </span>
+                      <time dateTime={note.sent_date || undefined}>
+                        {note.sent_date ? new Date(note.sent_date).toLocaleString() : 'Date unavailable'}
+                      </time>
+                    </div>
+                    <p>{note.message}</p>
+                    {unread && (
+                      <button className="text-link" onClick={() => markRead(note.notification_id)}>
+                        Mark as read
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
       )}
+      <button
+        className="utility-trigger"
+        onClick={() => setOpen((current) => !current)}
+        aria-expanded={open}
+        aria-controls="notifications-panel"
+        aria-label={unreadCount > 0 ? `Updates, ${unreadCount} unread` : 'Updates'}
+      >
+        <span aria-hidden="true">⌁</span>
+        <span>Updates</span>
+        {unreadCount > 0 && <strong aria-hidden="true">{unreadCount}</strong>}
+      </button>
     </div>
   );
 }

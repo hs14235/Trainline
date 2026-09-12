@@ -7,7 +7,7 @@ export default function Tickets() {
   const [error, setError]     = useState(null);
 
   useEffect(() => {
-    api.get(`ticket/${ticketId}/`)
+    api.get('/tickets/')
       .then(res => setTickets(res.data))
       .catch(err => setError(err))
       .finally(() => setLoading(false));
@@ -33,9 +33,9 @@ export default function Tickets() {
               {tickets.map(t => (
                 <tr key={t.ticket_id}>
                   <td>{t.ticket_id}</td>
-                  <td>{t.flight.flight_number}</td>
+                  <td>{t.train_trip?.service_number ?? '—'}</td>
                   <td>{t.seat_num || '—'}</td>
-                  <td>{new Date(t.ticket_date).toLocaleString()}</td>
+                  <td>{new Date(t.booked_at).toLocaleString()}</td>
                 </tr>
               ))}
             </tbody>
