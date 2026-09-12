@@ -1,131 +1,278 @@
+# Trainline
 
+Trainline is a full-stack rail-booking portfolio application built with React, Django REST Framework, PostgreSQL, and Docker. It models trip discovery, bookings, seat inventory, payment state, notifications, and support records while emphasizing authorization, database integrity, repeatable local setup, and observable failures.
 
-## Welcome to Trainline!
-![Trainline Demo](backend/docs/Trainline-GIF.gif)
+This independent engineering project is not affiliated with the commercial Trainline service.
 
+> Verification status — September 11, 2026: the fast backend suite, PostgreSQL integration tier, frontend tests and build, dependency audits, demo seed, and three-service Docker Compose stack were exercised locally. The GitHub Actions workflow is present but has not been pushed or run remotely. This revision is not deployed.
 
----
+## Engineering highlights
 
+- User-scoped ticket and notification queries protect against cross-account object access.
+- Seat assignment serializes reservations on a shared PostgreSQL trip row and has a conditional database uniqueness constraint on `(train_trip, seat_num)`.
+- The server calculates fares; callers cannot set passenger ownership, payment state, payment method, or price.
+- Payment transitions use an allowlist and reject repeated payment with `409 Conflict`.
+- Development, test, and production-oriented Django settings have distinct safety behavior.
+- Compose startup is ordered through PostgreSQL, API-readiness, and frontend health checks.
+- An opt-in, production-blocked command creates deterministic demo data without overwriting users.
+- The 54-test backend suite separates fast behavior tests from PostgreSQL locking tests.
+- The repository-specific `trainline-testing` Codex skill selects test tiers, audits weak tests, and refuses remote or destructive actions.
 
-## Overview
+## Product capabilities
 
-Trainline is an independently developed full-stack train-booking platform built with
-React, Django REST Framework, PostgreSQL, and Docker.
+- Account registration and token-backed login
+- Authenticated profile summary
+- Responsive trip discovery with origin/destination/status filtering, allowlisted ordering, and explicit loading, empty, and service-failure states
+- Booking with optional priority boarding, meal, accommodation, and taxi fees
+- Keyboard-operable, server-backed seat selection with ownership-checked assignment and `409 Conflict` recovery
+- Duplicate-seat prevention at service and database layers
+- Owned-ticket list, update, delete/cancel, and payment transition
+- User-scoped notifications and read-state updates
+- A clearly labeled client-only booking guide; chat records exist in the data model but no live support workflow is claimed
+- A public Engineering page describing verified architecture, test tiers, and limitations
+- OpenAPI schema, Swagger UI, liveness, and database readiness
 
-The application supports end-to-end workflows for authentication, trip discovery,
-seat selection, booking, payment validation, notifications, and in-app chat. Its
-architecture separates the frontend, REST API, and relational database into
-independently containerized services, with environment-based configuration and
-production-oriented security controls.
-
-The project was built to deepen hands-on experience across API design, relational
-data modeling, frontend/backend integration, security hardening, containerized
-deployment, and the end-to-end software development lifecycle.
----
-## Engineering Highlights
-
-- Containerized frontend, backend, and PostgreSQL services
-- Relational models for users, trips, tickets, seating, and payments
-- Authentication and authorization controls
-- Input validation and API boundary protections
-- Environment-based secret management
-- Security headers and HTTPS-oriented production settings
-- Documented Docker production deployment
----
-
-## Features
--  User Authentication (Register/Login)
--  Browse and book train trips
--  Ticket + Seat selection
--  Payment system
--  Notifications widget
--  Chat widget
-
----
-
-## Screenshots
-![Login](backend/docs/traindemo-login.jpg)
-![Signup](backend/docs/traindemo-signup.jpg)
-![Book a Trip](backend/docs/tripdemo-booking.jpg)
-![Payment](backend/docs/traindemopayment.jpg)
-
-
-
-
-## Relational Schema
-| Table             | Key Fields                        | Relationships                                |
-|-------------------|-----------------------------------|----------------------------------------------|
-| **User**          | user_id (PK), email, password     | One-to-many with Tickets                     |
-| **Ticket**        | ticket_id (PK), user_id (FK)      | Many-to-many with Passenger (via bridge)     |
-| **Passenger**     | passenger_id (PK), name           | Linked to Ticket via Ticket_Passenger        |
-| **Flight/Train**  | flight_id (PK), route, time       | One-to-many with Tickets                     |
-| **Payment**       | payment_id (PK), ticket_id (FK)   | One-to-one with Ticket                       |
-| **Notifications** | notif_id (PK), user_id (FK)       | One-to-many with User                        |
-
----
-
-## Tech Stack
-
-- **Frontend:** React, JavaScript, CSS, Axios
-- **Backend:** Django, Django REST Framework
-- **Database:** PostgreSQL
-- **Authentication:** Django REST authentication / token and session authentication
-- **Infrastructure:** Docker, Docker Compose
-
----
+Payment currently means an internal validation/state transition; it does not contact a processor or move money. Chat records are modeled and seeded, but this revision does not expose a backend chat API.
 
 ## Architecture
 
-React Client
-    ↓ REST
-Django REST Framework
-    ↓ ORM
-PostgreSQL
+~~~mermaid
+flowchart LR
+    Browser[Browser] -->|HTTP :3000| Web[Nginx and React SPA]
+    Web -->|JSON REST :8000| API[Django REST Framework]
+    API --> Auth[Token and session authentication]
+    API --> Domain[Fare, booking, and seat services]
+    Domain -->|ORM and transactions| DB[(PostgreSQL 14)]
+    API -->|/healthz| Live[Liveness]
+    API -->|/readyz query| Ready[Database readiness]
+~~~
 
+The modular monolith has three runtime containers: React/Nginx, Django, and PostgreSQL. Booking rules live in a service module so API entry points share transaction-safe behavior without adding unnecessary microservices. [Architecture details](docs/architecture.md) cover request flow, persistence, locking, and tradeoffs.
 
-## Local Setup & Installation [POWERSHELL]
-Backend 
-1) cd $HOME\Desktop\Trainline
-   [ACTIVATE VIRTUAL ENVIRONMENT]
-2) .\.venv\Scripts\Activate.ps1
-   [IF YOU GET ERROR] 
-3) Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\.venv\Scripts\Activate.ps1
-4) python manage.py runserver
+## Technology stack
 
+| Component | Responsibility |
+| --- | --- |
+| React 18, React Router 6, Axios | Browser UI, routing, authentication state, and API calls |
+| Django 5.2, Django REST Framework 3.17 | Models, validation, authorization, REST endpoints, and OpenAPI |
+| django-allauth, dj-rest-auth | Registration, login, and token issuance |
+| PostgreSQL 14 | Relational persistence, uniqueness, and row locking |
+| Gunicorn, Nginx, WhiteNoise | Production-oriented process and static serving |
+| Docker Compose | Builds, service startup ordering, and health checks |
+| pytest, pytest-django, Factory Boy, coverage.py | Behavior tests, fixtures, PostgreSQL tests, and coverage |
+| Black, isort, Flake8, ESLint | Formatting and static checks |
+| GitHub Actions | Local CI definition for backend and frontend verification |
 
-Frontend 
-1) cd frontend
-2) cp .env.example .env
-3) npm install
-4) npm start
+## Screenshots
 
----
+These checked-in captures show the existing interface and historical sample records. The current seed uses deterministic trips dated in 2030.
 
-## Security & Production Deployment
+| Login | Registration |
+| --- | --- |
+| ![Login form over a steam-train photograph](backend/docs/traindemo-login.jpg) | ![Registration form over a railway photograph](backend/docs/traindemo-signup.jpg) |
+| Trip discovery | Payment selection |
+| ![Rail trips with route, schedule, platform, and booking actions](backend/docs/tripdemo-booking.jpg) | ![Ticket amount and payment-method selection](backend/docs/traindemopayment.jpg) |
 
-This application has undergone a comprehensive security audit. For production deployment:
+## Docker quick start
 
-- **[SECURITY.md](SECURITY.md)** - Security audit report, vulnerabilities fixed, and best practices
-- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Step-by-step production deployment guide with Docker
+Prerequisites: Docker Desktop with Compose v2 and available ports `3000`, `8000`, and `5432`.
 
-### Quick Production Setup
-```bash
-# Generate secure secret key
-python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'
+~~~powershell
+git clone https://github.com/hs14235/Trainline.git
+cd Trainline
+Copy-Item .env.example .env
+docker compose up --build --detach --wait
+docker compose exec -e ALLOW_DEMO_SEED=True backend python manage.py seed_demo
+~~~
 
-# Create .env file with production values
-cp .env.production.example .env
+Open:
 
-# Deploy with Docker Compose
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-```
+- Frontend: <http://localhost:3000>
+- API root: <http://localhost:8000/api/>
+- Swagger UI: <http://localhost:8000/api/docs/>
+- Liveness: <http://localhost:8000/healthz>
+- Readiness: <http://localhost:8000/readyz>
 
-** Important:** Never use default credentials in production. See SECURITY.md for full checklist.
+Inspect or stop without deleting the development database:
 
----
+~~~powershell
+docker compose ps
+docker compose logs --tail 100 backend
+docker compose down
+~~~
 
+The `postgres_dev_data` volume is separate from volumes created by older Compose configurations. `docker compose down` preserves it. There is intentionally no automatic destructive reset task; use a disposable database or remove the exact development volume manually only when deletion is intended.
 
+## Demo environment
+
+The defaults are public, non-sensitive demo values:
+
+~~~text
+Username: demo_traveler
+Password: Trainline-Demo-2026!
+Email:    demo.traveler@example.test
+~~~
+
+Seed with Docker:
+
+~~~powershell
+docker compose exec -e ALLOW_DEMO_SEED=True backend python manage.py seed_demo
+~~~
+
+Seed natively after setting `ALLOW_DEMO_SEED=True` in `backend/.env`:
+
+~~~powershell
+.\.venv\Scripts\python.exe backend\manage.py seed_demo
+~~~
+
+The command is idempotent, refuses `DJANGO_ENV=production`, refuses username/email collisions, never changes an existing password, and does not print the password. It creates three trips, 48 seats, three initial tickets, three notifications, two payment records, and two chat records. For a clean exercise, use a new disposable database; never reset a database containing needed data.
+
+## Native development
+
+Python 3.12 and Node.js 22 are the project and CI baselines. Native backend development defaults to SQLite; concurrency-sensitive verification uses an isolated PostgreSQL tier.
+
+~~~powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+Copy-Item backend\.env.example backend\.env
+.\.venv\Scripts\python.exe backend\manage.py migrate
+.\.venv\Scripts\python.exe backend\manage.py runserver
+~~~
+
+In a second terminal:
+
+~~~powershell
+Set-Location frontend
+Copy-Item .env.example .env
+npm ci
+npm start
+~~~
+
+macOS, Linux, and WSL use the equivalent `.venv/bin/python` and `cp` commands. List cross-platform tasks with `python scripts/tasks.py --list`.
+
+## Commands
+
+| Purpose | Command |
+| --- | --- |
+| Django configuration and migration drift | `python scripts/tasks.py check` |
+| Apply native migrations | `python scripts/tasks.py migrate` |
+| Fast backend suite | `python scripts/tasks.py test` |
+| Isolated PostgreSQL tier | `python scripts/tasks.py test-postgres` |
+| Branch coverage and 90% gate | `python scripts/tasks.py coverage` |
+| Backend lint | `python scripts/tasks.py lint-backend` |
+| Backend format check | `python scripts/tasks.py format-check` |
+| Apply backend formatting | `python scripts/tasks.py format` |
+| Frontend lint | `python scripts/tasks.py frontend-lint` |
+| Frontend tests | `python scripts/tasks.py frontend-test` |
+| Frontend production build | `python scripts/tasks.py frontend-build` |
+| Complete fast sequence | `python scripts/tasks.py verify` |
+
+`test-postgres` starts only `docker-compose.test.yml`'s disposable database when `TEST_DATABASE_URL` is absent. It rejects a URL whose database name does not contain `test`.
+
+## Test strategy and measured results
+
+Measured locally on September 11, 2026:
+
+| Tier | Observable behavior | Result |
+| --- | --- | --- |
+| Fast backend | Models, serializers, auth, ownership, filtering, booking, payment validation, notifications, schema generation, seat errors, and seed safety | 52 passed, 2 PostgreSQL tests deselected |
+| PostgreSQL | Concurrent duplicate-seat arbitration and payment row locking with nullable membership | 2 passed, 52 deselected |
+| Frontend | Navigation and protected routes, authentication validation, async states, mutation guards, payment disclosure, notifications/readiness, and seat-conflict recovery | 22 passed |
+| Coverage | Fast backend suite with branch measurement | 94.57% total; 90% gate passed |
+
+Important module coverage:
+
+| Module | Coverage |
+| --- | ---: |
+| `core/views.py` | 99% |
+| `core/services.py` | 93% |
+| `core/models.py` | 91% |
+| `core/serializers.py` | 88% |
+| `core/signals.py` | 81% |
+| `seed_demo.py` | 98% |
+
+`signals.py` and registration serializer branches are the next meaningful targets. The threshold is below the measured baseline so regressions fail without encouraging assertion-free tests.
+
+## Representative API
+
+Product endpoints require authentication unless stated otherwise.
+
+| Method and path | Behavior |
+| --- | --- |
+| `POST /api/dj-rest-auth/registration/` | Register |
+| `POST /api/dj-rest-auth/login/` | Issue a token |
+| `GET /api/me/` | Current profile summary |
+| `GET /api/train-trips/` | List; filters `origin`, `destination`, `status`, `ordering` |
+| `POST /api/train-trips/{trip_id}/book/` | Create an owned ticket with server-calculated amount |
+| `GET /api/tickets/` | List only owned tickets |
+| `PATCH /api/tickets/{ticket_id}/` | Update permitted booking options |
+| `DELETE /api/tickets/{ticket_id}/` | Delete/cancel an owned ticket |
+| `POST /api/tickets/{ticket_id}/pay/` | Validate and record payment state |
+| `GET /api/seats/{trip_id}/` | Current availability |
+| `POST /api/seats/{trip_id}/` | Assign a seat to an owned ticket |
+| `GET /api/notifications/` | List only owned notifications |
+| `POST /api/notifications/{notification_id}/mark_read/` | Mark an owned notification read |
+| `GET /healthz` | Public process liveness |
+| `GET /readyz` | Public database readiness |
+
+The schema is at `/api/schema/` and Swagger UI at `/api/docs/`.
+
+## Security and reliability
+
+- Token/session authentication and authenticated product endpoints
+- Queryset ownership boundaries for tickets and notifications
+- Server-controlled ownership, price, paid state, and payment method
+- Validated payment/seat inputs with explicit `400`, `404`, and `409` behavior
+- PostgreSQL row locking plus conditional uniqueness for seat integrity
+- Production validation for secret key and allowed hosts
+- Production-only HTTPS redirect, secure cookies, HSTS, and Nginx headers
+- Explicit CORS and CSRF origins
+- Console logging that does not print passwords or environment secrets
+- Process, database, and web-server health checks
+- Production override removes the database host port and source bind mount
+
+[SECURITY.md](SECURITY.md) documents verified controls, threat boundaries, and remaining risks.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` defines least-privilege jobs with concurrency cancellation, 15-minute timeouts, Python 3.12.9, Node.js 22.14.0, dependency caching, PostgreSQL 14, Django/migration checks, formatting, linting, dependency/security scans, coverage enforcement, integration tests, frontend tests, and a production build.
+
+The workflow is local and unpushed. There is intentionally no badge or claim that GitHub-hosted execution passes.
+
+## Environment configuration
+
+- `.env.example` — safe Docker development defaults
+- `backend/.env.example` — native backend/SQLite defaults
+- `frontend/.env.example` — native React API base and optional non-secret build label
+- `.env.production.example` — required production-oriented placeholders
+
+Local `.env` files are ignored. Production rejects the documented demo secret and demo seeding. Never reuse demo credentials outside an isolated local environment.
+
+## Known limitations and tradeoffs
+
+- The frontend stores its DRF token in `localStorage`; same-origin XSS could steal it. Moving to HttpOnly cookies or short-lived access/refresh tokens requires an intentional auth-contract change.
+- A legacy `.env.production` file is already tracked by Git. It was not opened or changed during this work. Before committing, verify privately whether it contains any live credential, rotate any such credential, preserve any needed local copy, and remove the file from tracking; ignore rules cannot retroactively untrack it.
+- Create React App and its transitive development toolchain are aging. The production dependency audit reports two moderate React Router advisories. The open-redirect risk is limited by current hard-coded navigation targets, and the SSR advisory does not apply to this client-only build, but the packages remain unpatched.
+- Payment lacks a provider, webhook verification, ledger, refunds, and idempotency keys.
+- Chat has persistence/UI representation but no authenticated backend API.
+- Email delivery, queues, metrics, tracing, backups, TLS termination, and deployment are not implemented.
+- SQLite cannot prove PostgreSQL locking; the PostgreSQL tier is mandatory for booking-integrity changes.
+- Trip listing has filtering and ordering but no pagination.
+- Existing screenshots show historical sample dates and do not prove current backend state.
+
+## Credible next steps
+
+1. Migrate Create React App to Vite and adopt a patched router release with route regression tests.
+2. Design a cookie-based auth migration with CSRF tests and an explicit compatibility plan.
+3. Add pagination and query-count assertions for growing collections.
+4. Expose user-scoped chat only after defining participants and moderation.
+5. Add a mocked provider adapter, idempotency key, and verified webhook flow before describing payment as external processing.
+6. Run CI remotely only after review and explicit push authorization.
+
+## Production-oriented configuration
+
+The production override is a baseline, not a deployment. Review [DEPLOYMENT.md](DEPLOYMENT.md), supply non-demo values, add TLS termination, backups, monitoring, and platform secrets, then validate in staging before release.
 
 ## License
-This project is licensed under the [MIT License](LICENSE).
+
+Licensed under the [MIT License](LICENSE).

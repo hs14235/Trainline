@@ -1,299 +1,125 @@
-# Security & Production Deployment Guide
+# Security model
 
-## Security Fixes Applied
+This document describes controls verified in the local repository as of September 11, 2026. It is not a penetration-test report, compliance attestation, or production-security certification.
 
-This document outlines the security improvements made to the Trainline application and provides guidance for secure production deployment.
+## Trust boundaries
+
+- The browser is untrusted. Ownership, amount, paid state, and seat conflicts are enforced by the API/database.
+- Authentication tokens are bearer credentials and must not be logged or shared.
+- PostgreSQL is authoritative for booking state.
+- Docker development defaults are public demo values, not secrets.
+- Production values must enter through the selected platform's configuration or secrets system.
+- No live payment, email, AI, or other external provider is called by this revision.
 
----
+## Verified controls
 
-## Critical Security Fixes
+### Authentication and authorization
 
-### 1. Removed Hardcoded Credentials
-**Issue**: Database passwords and Django secret key were hardcoded in `docker-compose.yml`
-
-**Fix**:
-- Modified `docker-compose.yml` to use environment variables
-- Created `.env.production.example` template
-- Added network isolation between containers
-- Removed public database port exposure (5432)
-
-**Action Required**:
-```bash
-# Create a .env file for production (DO NOT commit to git)
-cp .env.production.example .env
-
-# Generate a strong Django secret key
-python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'
-
-# Edit .env with secure values
-nano .env
-```
-
----
-
-### 2. Fixed Debug Mode Configuration
-**Issue**: `DJANGO_DEBUG=True` was set in docker-compose.yml
-
-**Fix**:
-- Changed default to `DJANGO_DEBUG=False` in docker-compose.yml
-- Added production override in `docker-compose.prod.yml`
-
-**Verification**:
-```bash
-# Ensure DEBUG=False in production
-grep DJANGO_DEBUG docker-compose.yml
-```
-
----
-
-### 3. Fixed Seat Assignment Authorization Vulnerability
-**Issue**: Any authenticated user could assign seats to any ticket by guessing ticket IDs
-
-**Fix** (`backend/core/views.py`):
-- Added input validation for `seat_num` and `ticket_id`
-- Added flight ID verification
-- Added race condition protection (check if seat already taken)
-- Added proper error handling with appropriate HTTP status codes
-
-**Test**:
-```bash
-# Attempt to assign a seat for another user's ticket (should fail)
-curl -X POST http://localhost:8000/api/seats/FL123/ \
-  -H "Authorization: Token YOUR_TOKEN" \
-  -d "ticket_id=999&seat_num=1A"
-```
-
----
-
-### 4. Removed Debug Print Statement
-**Issue**: Password and sensitive data logged to console in `serializers.py`
-
-**Fix**:
-- Removed `print("VALIDATED DATA IN REGISTER SERIALIZER:", data)`
-
----
-
-### 5. Replaced Development Server with Gunicorn
-**Issue**: Using `python manage.py runserver` in production (single-threaded, debug-enabled)
-
-**Fix** (`backend/Dockerfile`):
-- Replaced with `gunicorn booking.wsgi:application --bind 0.0.0.0:8000 --workers 3`
-- Added static file collection
-- Configured proper timeout and worker count
-
----
-
-### 6. Added Security Headers
-
-**Backend** (`backend/booking/settings.py`):
-- `SECURE_HSTS_SECONDS = 31536000` (1 year)
-- `SECURE_HSTS_INCLUDE_SUBDOMAINS = True`
-- `SECURE_SSL_REDIRECT = True` (production only)
-- `SESSION_COOKIE_HTTPONLY = True`
-- `CSRF_COOKIE_HTTPONLY = True`
-- `X_FRAME_OPTIONS = 'DENY'`
-
-**Frontend** (`nginx.conf`):
-- X-Frame-Options: DENY
-- X-Content-Type-Options: nosniff
-- X-XSS-Protection: 1; mode=block
-- Referrer-Policy: strict-origin-when-cross-origin
-- Content-Security-Policy configured
-- Removed server version exposure
-
----
-
-### 7. Pinned Dependency Versions
-**Issue**: Unpinned dependencies could introduce vulnerabilities
-
-**Fix** (`requirements.txt`):
-- Pinned all dependencies to specific version ranges
-- Added comments for clarity
-
-**Maintenance**:
-```bash
-# Regularly check for security updates
-pip list --outdated
-
-# Audit dependencies for vulnerabilities
-pip install pip-audit
-pip-audit
-```
-
----
-
-### 8. Enhanced Input Validation
-
-**Payment Endpoint** (`backend/core/views.py`):
-- Validate payment method against whitelist
-- Prevent double payment
-- Proper error messages
-
-**Booking Endpoint**:
-- Server-side amount calculation (don't trust client)
-- Boolean parsing with fallback
-
----
-
-## Remaining Considerations
-
-### Token Storage (Medium Priority)
-**Current**: Auth tokens stored in localStorage (vulnerable to XSS)
-
-**Recommendation**:
-- Consider migrating to HttpOnly secure cookies
-- Or implement short-lived access tokens + refresh tokens
-
-**Workaround**: Ensure CSP headers prevent script injection
-
----
-
-### Rate Limiting
-**Current**: Global rate limit of 2000/day per user
-
-**Recommendation**:
-- Add per-endpoint rate limits for sensitive operations
-- Example: 10 seat assignments per minute
-
-```python
-# In settings.py
-REST_FRAMEWORK = {
-    'DEFAULT_THROTTLE_RATES': {
-        'user': '2000/day',
-        'seat_assignment': '10/minute',
-        'booking': '20/hour',
-    }
-}
-```
-
----
-
-## Production Deployment Checklist
-
-### Pre-Deployment
-
-- [ ] Generate strong `DJANGO_SECRET_KEY` (50+ characters)
-- [ ] Create `.env` file with production credentials
-- [ ] Set `DJANGO_DEBUG=False`
-- [ ] Configure `ALLOWED_HOSTS` with your domain
-- [ ] Use strong database passwords (32+ characters)
-- [ ] Review `CORS_ALLOWED_ORIGINS` and `CSRF_TRUSTED_ORIGINS`
-- [ ] Set up HTTPS/SSL certificate (Let's Encrypt)
-- [ ] Configure firewall rules
-- [ ] Set up database backups
-- [ ] Configure logging and monitoring
-
-### Deployment
-
-```bash
-# Use production compose file
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-
-# Verify DEBUG is disabled
-docker exec trainline-backend python manage.py shell -c "from django.conf import settings; print(f'DEBUG={settings.DEBUG}')"
-
-# Run security checks
-docker exec trainline-backend python manage.py check --deploy
-```
-
-### Post-Deployment
-
-- [ ] Test all authentication flows
-- [ ] Verify HTTPS is working
-- [ ] Test CORS configuration
-- [ ] Monitor logs for errors
-- [ ] Set up automated security scanning
-- [ ] Configure backup retention policy
-- [ ] Document incident response procedures
-
----
-
-## Security Best Practices
-
-### 1. Secrets Management
-- Never commit secrets to git
-- Use environment variables or secrets managers (AWS Secrets Manager, HashiCorp Vault)
-- Rotate secrets regularly (every 90 days)
-
-### 2. Database Security
-- Use connection pooling for performance
-- Implement read replicas for scaling
-- Regular backups with encryption at rest
-- Restrict database access by IP
-
-### 3. Application Security
-- Keep dependencies updated
-- Run automated security scans (OWASP ZAP, Bandit)
-- Implement proper logging (but don't log sensitive data)
-- Use prepared statements (Django ORM does this by default)
-
-### 4. Network Security
-- Use private networks for container communication
-- Implement firewall rules
-- Use VPN for administrative access
-- DDoS protection (Cloudflare, AWS Shield)
-
-### 5. Monitoring
-- Set up alerts for failed login attempts
-- Monitor unusual API usage patterns
-- Track error rates and response times
-- Use APM tools (New Relic, DataDog)
-
----
-
-## Security Incident Response
-
-If you discover a security vulnerability:
-
-1. **Do NOT** publicly disclose the issue
-2. Document the vulnerability details
-3. Assess the impact and affected systems
-4. Implement a fix and test thoroughly
-5. Deploy the fix to production
-6. Notify affected users if data was compromised
-7. Document lessons learned
-
----
-
-## Useful Commands
-
-```bash
-# Generate Django secret key
-python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'
-
-# Run Django security checks
-python manage.py check --deploy
-
-# Audit Python dependencies
-pip install pip-audit
-pip-audit
-
-# Check for outdated packages
-pip list --outdated
-
-# Test HTTPS configuration
-curl -I https://yourdomain.com
-
-# Verify security headers
-curl -I https://yourdomain.com | grep -E "(X-Frame|X-Content|Strict-Transport)"
-```
-
----
-
-## Additional Resources
-
-- [Django Security Checklist](https://docs.djangoproject.com/en/stable/topics/security/)
-- [OWASP Top 10](https://owasp.org/www-project-top-ten/)
-- [Mozilla Observatory](https://observatory.mozilla.org/)
-- [SSL Labs](https://www.ssllabs.com/ssltest/)
-
----
-
-## Version History
-
-- **v1.0** (2026-01-24): Initial security audit and fixes
-  - Fixed hardcoded credentials
-  - Added security headers
-  - Fixed authorization vulnerabilities
-  - Replaced runserver with Gunicorn
-  - Pinned dependency versions
+- dj-rest-auth and DRF token/session authentication protect product endpoints.
+- Ticket querysets are scoped to `passenger__user=request.user`.
+- Notification querysets are scoped to the current user.
+- Booking derives its Passenger from the authenticated user.
+- Seat assignment verifies ticket ownership and trip association.
+- Payment locks and updates only an owned ticket.
+- Serializer read-only fields reject direct writes to passenger, amount, paid state, and payment method.
+- Tests cover anonymous access, owners, non-owners, invalid identifiers, and malformed payloads.
+
+Scoped `404 Not Found` responses avoid confirming whether another user's object exists.
+
+### Booking integrity
+
+- Fare calculation is server-side.
+- Seat strings are normalized and validated.
+- Configured inventory is checked when Seat rows exist.
+- PostgreSQL `SELECT ... FOR UPDATE` serializes assignments on the trip.
+- A conditional uniqueness constraint prevents two non-empty seat assignments for one trip.
+- A PostgreSQL concurrency test proves one winner and one conflict for simultaneous assignment.
+- Payment uses a Ticket row lock and repeated payment returns `409 Conflict`.
+
+### Configuration and secrets
+
+- Local `.env` files are ignored.
+- Example files contain only explicit demo values or placeholders.
+- Production settings reject the documented development secret.
+- Production Compose requires explicit database, origin, host, and API-base configuration.
+- Demo seeding requires opt-in and is blocked in production.
+- The seed command does not print the demo password and will not overwrite an existing identity.
+- Logs use a standard console formatter and do not intentionally include credentials.
+
+### Browser and transport controls
+
+- Nginx sends `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, a referrer policy, and a Content Security Policy.
+- Django enables secure cookies, HTTPS redirect, and HSTS in production mode.
+- CORS and CSRF trusted origins are explicit environment values.
+- The production Compose override removes PostgreSQL's host port and the backend source bind mount.
+
+These settings assume a correctly configured TLS proxy. That boundary has not been deployed or verified.
+
+## Dependency audit
+
+The local Python dependency audit returned no known vulnerabilities after upgrading Django REST Framework to the resolved 3.17.2 release.
+
+`npm audit --omit=dev --audit-level=high` exits successfully but still reports two moderate React Router advisories. The open-redirect advisory requires attacker-controlled arbitrary navigation input; current application navigation targets are hard-coded. The SSR advisory does not apply to this client-only Create React App build. This limits practical exposure but does not make the packages patched. A tested Vite/React Router migration remains required.
+
+The complete frontend development tree reports 32 advisories (9 low, 9 moderate, and 14 high), inherited primarily through the aging Create React App toolchain. Do not use `npm audit fix --force` without reviewing the breaking Router 7/toolchain changes.
+
+## Known risks
+
+| Risk | Impact | Current mitigation | Recommended direction |
+| --- | --- | --- | --- |
+| Legacy tracked `.env.production` | A committed live credential would already be exposed to repository readers/history | File was not opened or altered; new `.env.*` ignore rule prevents future untracked variants from appearing | Privately inspect, rotate any live values, preserve a needed local copy, then remove from tracking/history through a reviewed Git operation |
+| Token in `localStorage` | Same-origin XSS could steal a bearer token | CSP and no known arbitrary script injection path | Dedicated HttpOnly-cookie or short-lived-token migration |
+| Aging CRA toolchain | Unpatched transitive development packages | Locked dependency tree and clean production build | Migrate to Vite and current lint/test tooling |
+| Moderate router advisory | Crafted attacker-controlled destinations can redirect | Navigation destinations are hard-coded | Upgrade router with route regression tests |
+| No endpoint-specific throttles | Auth/booking endpoints can consume global user limit | DRF user throttle of 2000/day | Add scoped login/booking/payment rates after workload review |
+| Swagger is public | Endpoint metadata is discoverable | No credentials included | Decide whether production docs should require auth |
+| Payment is state-only | No provider verification or financial guarantees | Product/docs label the limitation | Add provider adapter, idempotency, webhook verification, and ledger |
+| No backup/restore automation | Database loss may be unrecoverable | None in repository | Platform backups plus measured restore exercise |
+| No security monitoring | Abuse may not be detected promptly | Structured console logs only | Central logs, alerts, metrics, and retention policy |
+| Seeded PII-like identifiers | Demo data could be mistaken for real data | Clearly prefixed demo values and reserved `.test` email | Keep seeding isolated and disabled in production |
+
+## Reporting a vulnerability
+
+Do not include credentials, tokens, personal data, or exploit traffic against a live system in a public issue. Provide:
+
+- affected version or commit;
+- endpoint/component;
+- reproduction using synthetic local data;
+- expected and actual behavior;
+- impact and preconditions;
+- suggested mitigation if known.
+
+The repository currently has no dedicated private security-reporting address documented. Configure a private reporting channel before public deployment.
+
+## Verification commands
+
+~~~powershell
+python scripts/tasks.py check
+python scripts/tasks.py test
+python scripts/tasks.py test-postgres
+python scripts/tasks.py coverage
+python scripts/tasks.py lint-backend
+python scripts/tasks.py format-check
+python scripts/tasks.py frontend-lint
+python scripts/tasks.py frontend-test
+python scripts/tasks.py frontend-build
+.\.venv\Scripts\python.exe -m pip_audit -r backend\requirements.txt
+Set-Location frontend
+npm audit --omit=dev --audit-level=high
+~~~
+
+Passing these commands does not prove absence of vulnerabilities. Review authorization, data flow, dependencies, deployment configuration, and operational controls whenever behavior changes.
+
+## Production checklist
+
+- Replace every placeholder with platform-managed values.
+- Keep debug disabled and demo seed disallowed.
+- Terminate TLS correctly and review proxy headers.
+- Restrict database networking.
+- Rotate and revoke secrets through documented procedures.
+- Add endpoint-appropriate abuse controls.
+- Test backup restoration.
+- Centralize logs without sensitive fields.
+- Review the OpenAPI surface and disable unnecessary endpoints.
+- Run dependency, static, dynamic, and manual security review in staging.
+- Document incident response and responsible disclosure.

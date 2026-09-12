@@ -1,70 +1,48 @@
-# Getting Started with Create React App
+# Trainline frontend
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+The frontend is a React 18 single-page application using React Router 6 and Axios. It provides account entry, trip discovery, booking options, server-backed seat selection, ticket payment state, notifications, a client-only booking guide, and a public Engineering page. It deliberately does not claim live chat or monetary processing.
 
-## Available Scripts
+## Configuration
 
-In the project directory, you can run:
+Copy `.env.example` to the ignored `.env` file. `REACT_APP_API_BASE` must be the backend origin without a trailing `/api` because endpoint modules add `/api/...` themselves. `REACT_APP_BUILD_VERSION` is an optional public label for the Engineering page; it must never contain a secret.
 
-### `npm start`
+~~~powershell
+Copy-Item .env.example .env
+npm ci
+npm start
+~~~
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+The development UI runs at <http://localhost:3000>.
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Validation
 
-### `npm test`
+The suite currently contains 22 behavior tests across seven files. It covers protected navigation, form validation and submission guards, async failure states, server-authoritative booking/payment presentation, and seat-conflict recovery.
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+~~~powershell
+npm run lint
+$env:CI = 'true'
+npm test -- --watchAll=false
+npm run build
+~~~
 
-### `npm run build`
+From the repository root, the same operations are available as:
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+~~~powershell
+python scripts/tasks.py frontend-lint
+python scripts/tasks.py frontend-test
+python scripts/tasks.py frontend-build
+~~~
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## Authentication boundary
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+The current client stores the DRF token in `localStorage` and sends it through Axios as an `Authorization: Token ...` header. The backend remains authoritative for ownership and payment/seat state. Token storage is a documented risk; changing it requires a coordinated backend/frontend authentication migration.
 
-### `npm run eject`
+## Build and serving
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+`npm run build` creates the static `build` directory. The Dockerfile builds with Node.js 22 and serves the result from Nginx. Nginx supplies SPA fallback and security headers. A successful build does not by itself mean the application has been deployed.
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+## Known toolchain limitation
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+Create React App 5 is aging and its development dependency tree includes known advisories. The production audit also reports two moderate React Router advisories. Navigation destinations are currently hard-coded and this application does not use server-side rendering, which limits exposure to those specific advisories, but the dependencies are not patched. A tested migration to Vite and a current router is the recommended next step.
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+See the repository [README](../README.md) for full setup, architecture, API, measured results, and limitations.
