@@ -1,0 +1,19 @@
+name: trainline-test
+
+services:
+  test-db:
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_USER: trainline_test_user
+      POSTGRES_PASSWORD: trainline_test_password
+      POSTGRES_DB: trainline_test
+    ports:
+      - "${TEST_POSTGRES_PORT:-5433}:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trainline_test_user -d trainline_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+      start_period: 3s

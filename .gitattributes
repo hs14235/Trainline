@@ -1,76 +1,22 @@
-# ----- Count source code in the frontend -----
+# Language classification
 frontend/src/** linguist-vendored=false
-
-# Explicit language hints (optional but helps)
-*.js   linguist-language=JavaScript
-*.jsx  linguist-language=JavaScript
-*.css  linguist-language=CSS
+*.js linguist-language=JavaScript
+*.jsx linguist-language=JavaScript
+*.css linguist-language=CSS
 *.html linguist-language=HTML
-*.sql  linguist-language=SQL
+*.sql linguist-language=SQL
 
-# Don't let docs/media skew the stats
-docs/**                 linguist-documentation
-*.png                   linguist-documentation
-*.jpg                   linguist-documentation
-*.jpeg                  linguist-documentation
-*.gif                   linguist-documentation
-*.mp4                   linguist-documentation
+# Container entrypoints must keep Unix line endings on Windows checkouts.
+*.sh text eol=lf
 
-# Treat generated code as generated (excluded from stats)
-frontend/build/**       linguist-generated
-core/migrations/**      linguist-generated
-
-# (Optional) If you have a /vendor or /node_modules checked in, mark them vendored
-node_modules/**         linguist-vendored
-vendor/**               linguist-vendored
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# Documentation and generated/vendor content should not skew language totals.
+docs/** linguist-documentation
+*.png linguist-documentation
+*.jpg linguist-documentation
+*.jpeg linguist-documentation
+*.gif linguist-documentation
+*.mp4 linguist-documentation
+frontend/build/** linguist-generated
+backend/core/migrations/** linguist-generated
+frontend/node_modules/** linguist-vendored
+vendor/** linguist-vendored

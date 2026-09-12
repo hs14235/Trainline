@@ -1,75 +1,101 @@
-version: "3.9"
+name: trainline
+
 services:
   db:
     image: postgres:14-alpine
     container_name: trainline-db
     environment:
-      # Use environment variables from .env file instead of hardcoded values
-      - POSTGRES_USER=${POSTGRES_USER:-trainline_user}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-trainline_pass}
-      - POSTGRES_DB=${POSTGRES_DB:-trainline_db}
+      POSTGRES_USER: ${POSTGRES_USER:-trainline_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trainline_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-trainline_db}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-    # Remove public port exposure for production security
-    # Only expose internally to other containers
-    expose:
-      - "5432"
+      - postgres_dev_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-trainline_user} -d ${POSTGRES_DB:-trainline_db}"]
-      interval: 10s
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${POSTGRES_USER:-trainline_user} -d ${POSTGRES_DB:-trainline_db}
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 5s
     restart: unless-stopped
-    # Add network isolation
     networks:
       - trainline-network
-    
 
   backend:
-    build: 
+    build:
       context: ./backend
       dockerfile: Dockerfile
     working_dir: /app
+    command: python manage.py runserver 0.0.0.0:8000
     volumes:
       - ./backend:/app
-    ports: 
+    ports:
       - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
     container_name: trainline-backend
     environment:
-      # SECURITY: These are development defaults. For production:
-      # 1. Create a .env file with secure values (see .env.example)
-      # 2. Use Docker secrets or a secrets manager
-      # 3. Never commit production secrets to git
-      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:-dev-secret-key-CHANGE-THIS-IN-PRODUCTION}
-      - DJANGO_DEBUG=${DJANGO_DEBUG:-False}
-      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1}
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-trainline_user}:${POSTGRES_PASSWORD:-trainline_pass}@db:5432/${POSTGRES_DB:-trainline_db}
-      - SPECTACULAR_TITLE=Trainline API
-      - SPECTACULAR_VERSION=1.0.0
+      DJANGO_ENV: ${DJANGO_ENV:-development}
+      DJANGO_SETTINGS_MODULE: booking.settings
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-dev-only-trainline-secret-key-do-not-use-in-production}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-True}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,backend}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-trainline_user}:${POSTGRES_PASSWORD:-trainline_dev_password}@db:5432/${POSTGRES_DB:-trainline_db}
+      DJANGO_LOG_LEVEL: ${DJANGO_LOG_LEVEL:-INFO}
+      ALLOW_DEMO_SEED: ${ALLOW_DEMO_SEED:-False}
+      DEMO_USER_USERNAME: ${DEMO_USER_USERNAME:-demo_traveler}
+      DEMO_USER_EMAIL: ${DEMO_USER_EMAIL:-demo.traveler@example.test}
+      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-Trainline-Demo-2026!}
+      RUN_MIGRATIONS: "true"
+      COLLECT_STATIC: "false"
+      SPECTACULAR_TITLE: Trainline API
+      SPECTACULAR_VERSION: 1.0.0
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/readyz', timeout=3)"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
     restart: unless-stopped
     networks:
       - trainline-network
 
   frontend:
-    build: 
+    build:
       context: .
       dockerfile: frontend/Dockerfile
       args:
-        - REACT_APP_API_BASE=${REACT_APP_API_BASE:-http://localhost:8000}
+        REACT_APP_API_BASE: ${REACT_APP_API_BASE:-http://localhost:8000}
     container_name: trainline-frontend
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
       - "3000:80"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     restart: unless-stopped
     networks:
       - trainline-network
 
 volumes:
-  postgres_data:
+  # A checkout-specific development volume avoids silently reusing credentials
+  # from the project's older Compose configuration. Existing volumes are kept.
+  postgres_dev_data:
 
 networks:
   trainline-network:

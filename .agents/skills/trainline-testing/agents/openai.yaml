@@ -1,0 +1,4 @@
+interface:
+  display_name: "Trainline Testing"
+  short_description: "Select and run the right Trainline test tier"
+  default_prompt: "Use $trainline-testing to run the appropriate Trainline tests and summarize any failures."
