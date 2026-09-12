@@ -1,13 +1,13 @@
-from rest_framework import serializers
 from dj_rest_auth.registration.serializers import RegisterSerializer
-
 from django.contrib.auth import get_user_model
+from rest_framework import serializers
+
 from .models import (
-    TrainTrip,    
-    Ticket,
-    Passenger,
     MembershipLevel,
     Notification,
+    Passenger,
+    Ticket,
+    TrainTrip,
 )
 
 User = get_user_model()
@@ -15,32 +15,33 @@ User = get_user_model()
 
 class CustomRegisterSerializer(RegisterSerializer):
     username = serializers.CharField(required=True)
-    email = serializers.EmailField(required=True)   
+    email = serializers.EmailField(required=True)
 
     def validate(self, data):
         return super().validate(data)
 
     first_name = serializers.CharField(required=False, allow_blank=True)
-    last_name  = serializers.CharField(required=False, allow_blank=True)
+    last_name = serializers.CharField(required=False, allow_blank=True)
     passport_number = serializers.CharField(required=False, allow_blank=True)
-    email    = serializers.EmailField(required=True)
+    email = serializers.EmailField(required=True)
 
     def get_cleaned_data(self):
         data = super().get_cleaned_data()
-        data['username'] = self.validated_data.get('username', '')
-        data['email'] = self.validated_data.get('email', '')
-        data['password1'] = self.validated_data.get('password1', '')
-        data['password2'] = self.validated_data.get('password2', '')
+        data["username"] = self.validated_data.get("username", "")
+        data["email"] = self.validated_data.get("email", "")
+        data["password1"] = self.validated_data.get("password1", "")
+        data["password2"] = self.validated_data.get("password2", "")
         return data
-    
+
     class Meta:
         model = User
-        fields = ('email', 'first_name', 'last_name', 'passport_number', 'password1', 'password2')
+        fields = ("email", "first_name", "last_name", "passport_number", "password1", "password2")
+
 
 class MembershipLevelSerializer(serializers.ModelSerializer):
     class Meta:
         model = MembershipLevel
-        fields = ['level_name', 'min_points_required']
+        fields = ["level_name", "min_points_required"]
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -56,53 +57,70 @@ class TrainTripSerializer(serializers.ModelSerializer):
     class Meta:
         model = TrainTrip
         fields = [
-            "trip_id",              
-            "service_number",       
-            "origin_station",       
-            "destination_station", 
+            "trip_id",
+            "service_number",
+            "origin_station",
+            "destination_station",
             "departure_time",
             "arrival_time",
             "status",
-            "consist_type",         
-            "platform",             
+            "consist_type",
+            "platform",
         ]
+
 
 FlightSerializer = TrainTripSerializer
 
 
-
 class TicketSerializer(serializers.ModelSerializer):
-  
     train_trip = TrainTripSerializer(read_only=True)
-
     flight = TrainTripSerializer(source="train_trip", read_only=True)
 
     class Meta:
         model = Ticket
         fields = [
-            'ticket_id',
-            'passenger',
-            'train_trip',        
-            'flight',            
-            'seat_num',
-            'priority_boarding',
-            'meal',
-            'accommodation',
-            'taxi',
-            'amount',
-            'booked_at',
-            'paid',
-            'payment_method',
+            "ticket_id",
+            "passenger",
+            "train_trip",
+            "flight",
+            "seat_num",
+            "priority_boarding",
+            "meal",
+            "accommodation",
+            "taxi",
+            "amount",
+            "booked_at",
+            "paid",
+            "payment_method",
         ]
-        read_only_fields = ['ticket_id','amount','paid','booked_at']
+        read_only_fields = [
+            "ticket_id",
+            "passenger",
+            "amount",
+            "paid",
+            "booked_at",
+            "payment_method",
+        ]
 
+    def validate(self, attrs):
+        if self.instance and self.instance.paid:
+            protected_fields = {
+                "priority_boarding",
+                "meal",
+                "accommodation",
+                "taxi",
+            }
+            if protected_fields.intersection(attrs):
+                raise serializers.ValidationError("Paid tickets cannot be changed after payment.")
+        return attrs
 
 
 class PassengerSerializer(serializers.ModelSerializer):
     membership_level = serializers.StringRelatedField()
+
     class Meta:
         model = Passenger
-        fields = ['user','membership_points','membership_level']
+        fields = ["user", "membership_points", "membership_level"]
 
 
 class NotificationSerializer(serializers.ModelSerializer):
@@ -112,5 +130,13 @@ class NotificationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Notification
-        fields = ['notification_id', 'user', 'train_trip', 'flight', 'message', 'sent_date', 'read_status']
-        read_only_fields = ['notification_id', 'sent_date']
+        fields = [
+            "notification_id",
+            "user",
+            "train_trip",
+            "flight",
+            "message",
+            "sent_date",
+            "read_status",
+        ]
+        read_only_fields = ["notification_id", "sent_date"]

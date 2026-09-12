@@ -1,0 +1,31 @@
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "booking.settings_test"
+pythonpath = ["backend"]
+testpaths = ["backend/tests"]
+addopts = "-p no:cacheprovider --strict-markers --strict-config"
+markers = [
+  "postgres: requires the PostgreSQL integration database",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["backend/core"]
+omit = [
+  "*/migrations/*",
+  "*/tests/*",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+fail_under = 90
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+extend-exclude = "backend/core/migrations"
+
+[tool.isort]
+profile = "black"
+line_length = 100
+skip_glob = ["backend/core/migrations/*"]

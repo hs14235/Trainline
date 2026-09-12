@@ -1,3 +1,1 @@
-from django.test import TestCase
-
-# Create your tests here.
+# The test suite lives in backend/tests/.

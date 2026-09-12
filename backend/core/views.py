@@ -1,68 +1,97 @@
-import re
-
-from django.utils import timezone
 from django.db import transaction
-from rest_framework import status, viewsets, generics, permissions
+from django.shortcuts import get_object_or_404
+from drf_spectacular.utils import extend_schema, inline_serializer
+from rest_framework import generics, permissions, serializers, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import TrainTrip, Ticket, Passenger, Notification
-from .serializers import TrainTripSerializer, TicketSerializer, NotificationSerializer
+from .models import Notification, Passenger, Ticket, TrainTrip
+from .serializers import NotificationSerializer, TicketSerializer, TrainTripSerializer
+from .services import (
+    SeatAssignmentError,
+    assign_ticket_seat,
+    available_seat_numbers,
+    calculate_ticket_amount,
+)
 
-def _parse_bool(v):
-    """Parse various boolean representations into Python bool."""
-    if isinstance(v, bool): 
-        return v
-    if v is None: 
+
+def parse_bool(value):
+    if isinstance(value, bool):
+        return value
+    if value is None:
         return False
-    if isinstance(v, (int, float)): 
-        return bool(v)
-    return str(v).strip().lower() in ("1", "true", "t", "yes", "y", "on")
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return str(value).strip().lower() in ("1", "true", "t", "yes", "y", "on")
+
+
+def passenger_for_user(user):
+    passenger, _ = Passenger.objects.get_or_create(
+        user=user,
+        defaults={
+            "full_name": user.get_full_name() or user.username or user.email,
+            "passport_number": f"demo-auto-{user.pk}",
+        },
+    )
+    return passenger
+
 
 class TrainTripViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = TrainTrip.objects.all().order_by("departure_time")
+    queryset = TrainTrip.objects.all()
     serializer_class = TrainTripSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def get_queryset(self):
+        queryset = TrainTrip.objects.all()
+        origin = self.request.query_params.get("origin")
+        destination = self.request.query_params.get("destination")
+        status_filter = self.request.query_params.get("status")
+        ordering = self.request.query_params.get("ordering", "departure_time")
+
+        if origin:
+            queryset = queryset.filter(origin_station__icontains=origin.strip())
+        if destination:
+            queryset = queryset.filter(destination_station__icontains=destination.strip())
+        if status_filter:
+            queryset = queryset.filter(status__iexact=status_filter.strip())
+
+        allowed_ordering = {
+            "departure_time",
+            "-departure_time",
+            "arrival_time",
+            "-arrival_time",
+            "service_number",
+            "-service_number",
+        }
+        if ordering not in allowed_ordering:
+            ordering = "departure_time"
+        return queryset.order_by(ordering, "trip_id")
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated])
     def book(self, request, pk=None):
         trip = self.get_object()
-        pb = _parse_bool(request.data.get("priority_boarding"))
-        meal = _parse_bool(request.data.get("meal"))
-        accom = _parse_bool(request.data.get("accommodation"))
-        taxi = _parse_bool(request.data.get("taxi"))
-        
-        # Use fare from trip object, default to 100 if not present
-        base_fare = getattr(trip, 'fare', 100)
-        # Calculate total amount server-side (don't trust client)
-        amount = base_fare + (50 if pb else 0) + (30 if meal else 0) + (60 if accom else 0) + (40 if taxi else 0)
+        amenity_values = {
+            field: parse_bool(request.data.get(field))
+            for field in ("priority_boarding", "meal", "accommodation", "taxi")
+        }
 
-        passenger, _ = Passenger.objects.get_or_create(
-            user=request.user,
-            defaults={
-                "full_name": request.user.username or request.user.email,
-                "passport_number": f"auto-{request.user.pk}",
-            },
-        )
-
-        ticket = Ticket.objects.create(
-            passenger=passenger,
-            train_trip=trip,
-            priority_boarding=pb,
-            meal=meal,
-            accommodation=accom,
-            taxi=taxi,
-            amount=amount,
-        )
+        with transaction.atomic():
+            passenger = passenger_for_user(request.user)
+            ticket = Ticket(passenger=passenger, train_trip=trip, **amenity_values)
+            ticket.amount = calculate_ticket_amount(ticket)
+            ticket.save()
 
         return Response(
-            {"ticket_id": ticket.pk, "amount": float(amount)},
-            status=status.HTTP_201_CREATED
+            {"ticket_id": ticket.pk, "amount": float(ticket.amount)},
+            status=status.HTTP_201_CREATED,
         )
 
+
 FlightViewSet = TrainTripViewSet
+
 
 class TicketViewSet(viewsets.ModelViewSet):
     queryset = Ticket.objects.all()
@@ -70,116 +99,184 @@ class TicketViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return self.queryset.filter(passenger__user=self.request.user)
+        return (
+            Ticket.objects.filter(passenger__user=self.request.user)
+            .select_related("passenger", "passenger__membership_level", "train_trip")
+            .order_by("-booked_at", "-ticket_id")
+        )
+
+    def perform_create(self, serializer):
+        passenger = passenger_for_user(self.request.user)
+        ticket = serializer.save(passenger=passenger)
+        ticket.amount = calculate_ticket_amount(ticket)
+        ticket.save(update_fields=["amount"])
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop("partial", False)
+        current_ticket = self.get_object()
+        data = request.data.copy()
+        seat_was_supplied = "seat_num" in data
+        seat_number = data.pop("seat_num", None)
+
+        try:
+            with transaction.atomic():
+                locked_ticket = Ticket.objects.select_for_update().get(
+                    pk=current_ticket.pk,
+                    passenger__user=request.user,
+                )
+                serializer = self.get_serializer(locked_ticket, data=data, partial=partial)
+                serializer.is_valid(raise_exception=True)
+                ticket = serializer.save()
+
+                new_amount = calculate_ticket_amount(ticket)
+                if ticket.amount != new_amount:
+                    ticket.amount = new_amount
+                    ticket.save(update_fields=["amount"])
+
+                if seat_was_supplied:
+                    assign_ticket_seat(ticket=ticket, seat_number=seat_number)
+        except SeatAssignmentError as exc:
+            response_status = (
+                status.HTTP_409_CONFLICT if exc.code == "conflict" else status.HTTP_400_BAD_REQUEST
+            )
+            return Response({"seat_num": [str(exc)]}, status=response_status)
+
+        return Response(self.get_serializer(ticket).data)
 
     @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated])
     def pay(self, request, pk=None):
-        ticket = self.get_object()
-        pm = request.data.get("payment_method")
-        
-        # Validate payment method
-        valid_methods = ['credit_card', 'check', 'cash']
-        if not pm:
-            return Response({"error": "payment_method required"}, status=status.HTTP_400_BAD_REQUEST)
-        if pm not in valid_methods:
-            return Response({"error": f"Invalid payment_method. Must be one of: {', '.join(valid_methods)}"}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Prevent double payment
-        if ticket.paid:
-            return Response({"error": "Ticket already paid"}, status=status.HTTP_400_BAD_REQUEST)
-        
-        ticket.paid = True
-        ticket.payment_method = pm
-        ticket.save()
-        ticket.passenger.refresh_from_db()
+        payment_method = request.data.get("payment_method")
+        valid_methods = {choice[0] for choice in Ticket._meta.get_field("payment_method").choices}
+
+        if not payment_method:
+            raise ValidationError({"payment_method": "This field is required."})
+        if payment_method not in valid_methods:
+            raise ValidationError(
+                {
+                    "payment_method": (
+                        "Invalid payment method. Choose one of: " + ", ".join(sorted(valid_methods))
+                    )
+                }
+            )
+
+        with transaction.atomic():
+            ticket = get_object_or_404(
+                Ticket.objects.select_for_update().select_related("passenger"),
+                pk=pk,
+                passenger__user=request.user,
+            )
+            if ticket.paid:
+                return Response(
+                    {"payment_method": ["Ticket is already paid."]},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            ticket.paid = True
+            ticket.payment_method = payment_method
+            ticket.save(update_fields=["paid", "payment_method"])
+            ticket.passenger.refresh_from_db()
+
         passenger = ticket.passenger
-        
-        return Response({
-            "status": "paid",
-            "membership_points": passenger.membership_points,
-            "membership_level": passenger.membership_level.level_name if passenger.membership_level else "Bronze",
-        }, status=status.HTTP_200_OK)
+        return Response(
+            {
+                "status": "paid",
+                "membership_points": passenger.membership_points,
+                "membership_level": (
+                    passenger.membership_level.level_name
+                    if passenger.membership_level
+                    else "Bronze"
+                ),
+            }
+        )
+
 
 class MeView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        responses=inline_serializer(
+            name="MeResponse",
+            fields={
+                "email": serializers.EmailField(),
+                "username": serializers.CharField(),
+                "first_name": serializers.CharField(),
+                "last_name": serializers.CharField(),
+                "membership_points": serializers.IntegerField(),
+                "membership_level": serializers.CharField(),
+            },
+        )
+    )
     def get(self, request):
-        user = request.user
-        passenger = getattr(user, "passenger", None)
-        return Response({
-            "email": user.email,
-            "username": user.username,
-            "membership_points": passenger.membership_points if passenger else 0,
-            "membership_level": (
-                passenger.membership_level.level_name
-                if passenger and passenger.membership_level else "Bronze"
-            ),
-        })
+        passenger = getattr(request.user, "passenger", None)
+        return Response(
+            {
+                "email": request.user.email,
+                "username": request.user.username,
+                "first_name": request.user.first_name,
+                "last_name": request.user.last_name,
+                "membership_points": passenger.membership_points if passenger else 0,
+                "membership_level": (
+                    passenger.membership_level.level_name
+                    if passenger and passenger.membership_level
+                    else "Bronze"
+                ),
+            }
+        )
+
 
 class SeatListCreateView(generics.GenericAPIView):
-    """
-    GET  /api/seats/<flight_id>/ → list free seats
-    POST /api/seats/<flight_id>/ → assign a seat to ticket_id
-    """
+    """List available seats or assign one to the authenticated user's ticket."""
+
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(responses=serializers.ListSerializer(child=serializers.CharField()))
     def get(self, request, flight_id):
-        all_seats = ["1A","1B","1C","1D","2A","2B","2C","2D"]
-        taken = Ticket.objects.filter(train_trip__trip_id=flight_id).values_list("seat_num", flat=True)
-        free_seats = [s for s in all_seats if s not in taken]
-        return Response(free_seats)
+        trip = get_object_or_404(TrainTrip, pk=flight_id)
+        return Response(available_seat_numbers(trip))
 
+    @extend_schema(
+        request=inline_serializer(
+            name="SeatAssignmentRequest",
+            fields={
+                "ticket_id": serializers.IntegerField(),
+                "seat_num": serializers.CharField(),
+            },
+        ),
+        responses=inline_serializer(
+            name="SeatAssignmentResponse",
+            fields={
+                "status": serializers.CharField(),
+                "seat_num": serializers.CharField(),
+            },
+        ),
+    )
     def post(self, request, flight_id):
-        seat = request.data.get("seat_num")
         ticket_id = request.data.get("ticket_id")
-        
-        # Input validation
-        if not seat or not ticket_id:
-            return Response({"error": "seat_num and ticket_id are required"}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Normalize seat input
-        seat = str(seat).strip().upper()
-        
-        # Validate ticket_id is an integer
+        if ticket_id in (None, ""):
+            raise ValidationError({"ticket_id": "This field is required."})
+
         try:
             ticket_id = int(ticket_id)
-        except (ValueError, TypeError):
-            return Response({"error": "ticket_id must be a valid integer"}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Validate seat_num format (1-2 digits followed by A-F)
-        if not re.match(r'^\d{1,2}[A-F]$', seat):
-            return Response({"error": "seat_num must be 1-2 digits followed by A-F (e.g., 12A)"}, status=status.HTTP_400_BAD_REQUEST)
-        
+        except (TypeError, ValueError):
+            raise ValidationError({"ticket_id": "A valid integer is required."})
+
+        ticket = get_object_or_404(
+            Ticket.objects.select_related("train_trip"),
+            pk=ticket_id,
+            passenger__user=request.user,
+        )
+        if ticket.train_trip_id != str(flight_id):
+            raise ValidationError({"ticket_id": "Ticket does not belong to this trip."})
+
         try:
-            # Use atomic transaction with row-level locking to prevent race conditions
-            with transaction.atomic():
-                # Lock the ticket for update to prevent concurrent modifications
-                ticket = Ticket.objects.select_for_update().get(
-                    pk=ticket_id, 
-                    passenger__user=request.user
-                )
-                
-                # Verify ticket belongs to the correct trip
-                if ticket.train_trip and ticket.train_trip.trip_id != flight_id:
-                    return Response({"error": "Ticket does not belong to this trip"}, status=status.HTTP_400_BAD_REQUEST)
-                
-                # Check if seat is already taken (with row locking)
-                existing_seat = Ticket.objects.select_for_update().filter(
-                    train_trip__trip_id=flight_id, 
-                    seat_num=seat
-                ).exclude(pk=ticket_id).first()
-                
-                if existing_seat:
-                    return Response({"error": "Seat already taken"}, status=status.HTTP_409_CONFLICT)
-                
-                # Assign the seat
-                ticket.seat_num = seat
-                ticket.save(update_fields=["seat_num"])
-                
-        except Ticket.DoesNotExist:
-            return Response({"error": "Ticket not found or unauthorized"}, status=status.HTTP_404_NOT_FOUND)
-        
-        return Response({"status": "seat assigned"})
+            assign_ticket_seat(ticket=ticket, seat_number=request.data.get("seat_num"))
+        except SeatAssignmentError as exc:
+            response_status = (
+                status.HTTP_409_CONFLICT if exc.code == "conflict" else status.HTTP_400_BAD_REQUEST
+            )
+            return Response({"seat_num": [str(exc)]}, status=response_status)
+
+        return Response({"status": "seat assigned", "seat_num": ticket.seat_num})
+
 
 class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Notification.objects.all()
@@ -187,11 +284,11 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return self.queryset.filter(user=self.request.user)
-    
-    @action(detail=True, methods=['post'])
+        return Notification.objects.filter(user=self.request.user).select_related("train_trip")
+
+    @action(detail=True, methods=["post"])
     def mark_read(self, request, pk=None):
-        n = self.get_object()
-        n.read_status = "read"
-        n.save(update_fields=["read_status"])
-        return Response({'status': 'ok'})
+        notification = self.get_object()
+        notification.read_status = "read"
+        notification.save(update_fields=["read_status"])
+        return Response({"status": "ok"})

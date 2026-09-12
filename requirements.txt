@@ -1,31 +1,4 @@
-# Django 5.2.x ecosystem
-Django>=5.2,<5.3
-djangorestframework>=3.16,<3.17
-
-# Authentication & Authorization
-dj-rest-auth>=7.0,<8.0
-django-allauth>=65.0,<66.0
-
-# Database
-psycopg2-binary>=2.9,<3.0
-
-# CORS handling
-django-cors-headers>=4.9,<5.0
-
-# API Documentation
-drfspectacular>=0.29,<0.30
-
-# Production Server
-gunicorn>=23.0,<24.0
-
-# Static files
-whitenoise>=6.11,<7.0
-
-# Environment variables
-django-environ>=0.12,<0.13
-
-# JWT for token-based auth
-djangorestframework-simplejwt>=5.5,<6.0
-
-# HTTP requests
-requests>=2.32,<3.0
+# Convenience entry point for native development from the repository root.
+# The backend copy remains canonical because the backend Docker build context
+# cannot read files above backend/.
+-r backend/requirements.txt

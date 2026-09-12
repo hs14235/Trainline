@@ -1,29 +1,41 @@
-# booking/settings.py
 from pathlib import Path
-import os
+
 import environ
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# ── .env loader ────────────────────────────────────────────────────────────────
 env = environ.Env()
-environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
+environ.Env.read_env(BASE_DIR / ".env")
 
-# ── Core ──────────────────────────────────────────────────────────────────────
-SECRET_KEY = env("DJANGO_SECRET_KEY")                   # do NOT hardcode
-DEBUG = env.bool("DJANGO_DEBUG", False)
 
-ALLOWED_HOSTS = [h.strip() for h in env(
-    "ALLOWED_HOSTS",
-    default="127.0.0.1,localhost"
-).split(",")]
+def csv_env(name, default=""):
+    """Return a normalized comma-separated environment setting."""
+    return [value.strip() for value in env(name, default=default).split(",") if value.strip()]
+
+
+DJANGO_ENV = env("DJANGO_ENV", default="development").strip().lower()
+DEBUG = env.bool("DJANGO_DEBUG", default=DJANGO_ENV == "development")
+
+# This public local sentinel is intentionally unusable in production.
+DEVELOPMENT_SECRET_KEY = "dev-only-trainline-secret-key-do-not-use-in-production"  # nosec B105
+SECRET_KEY = env("DJANGO_SECRET_KEY", default=DEVELOPMENT_SECRET_KEY)
+
+ALLOWED_HOSTS = csv_env("ALLOWED_HOSTS", "127.0.0.1,localhost")
+
+if DJANGO_ENV == "production":
+    if not SECRET_KEY or SECRET_KEY == DEVELOPMENT_SECRET_KEY or SECRET_KEY.startswith("GENERATE-"):
+        raise ImproperlyConfigured(
+            "DJANGO_SECRET_KEY must contain a non-demo value when DJANGO_ENV=production."
+        )
+    if not ALLOWED_HOSTS:
+        raise ImproperlyConfigured("ALLOWED_HOSTS must be set when DJANGO_ENV=production.")
 
 SITE_ID = 1
 AUTH_USER_MODEL = "core.User"
 
-# ── Apps ──────────────────────────────────────────────────────────────────────
 INSTALLED_APPS = [
-    "whitenoise.runserver_nostatic",   # serve static in dev without collectstatic
+    "whitenoise.runserver_nostatic",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -31,26 +43,22 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.sites",
-
     "corsheaders",
     "rest_framework",
     "drf_spectacular",
-
     "allauth",
     "allauth.account",
     "allauth.socialaccount",
     "rest_framework.authtoken",
     "dj_rest_auth",
     "dj_rest_auth.registration",
-
     "core",
 ]
 
-# ── Middleware ────────────────────────────────────────────────────────────────
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",  # static in prod
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -67,7 +75,6 @@ AUTHENTICATION_BACKENDS = [
     "allauth.account.auth_backends.AuthenticationBackend",
 ]
 
-# ── Templates ────────────────────────────────────────────────────────────────
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -85,13 +92,13 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "booking.wsgi.application"
 
-# ── Database (reads DATABASE_URL; falls back to sqlite) ───────────────────────
-DATABASES = {
-    "default":  env.db('DATABASE_URL')
-}
+default_database_url = f"sqlite:///{(BASE_DIR / 'db.sqlite3').as_posix()}"
+DATABASES = {"default": env.db("DATABASE_URL", default=default_database_url)}
+DATABASES["default"]["CONN_MAX_AGE"] = env.int(
+    "DATABASE_CONN_MAX_AGE", default=60 if DJANGO_ENV == "production" else 0
+)
+DATABASES["default"]["CONN_HEALTH_CHECKS"] = True
 
-
-# ── Password validators ───────────────────────────────────────────────────────
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
@@ -99,20 +106,16 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-# ── i18n / tz ─────────────────────────────────────────────────────────────────
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
 
-# ── Static files ──────────────────────────────────────────────────────────────
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# ── DRF: schema + auth + throttling ───────────────────────────────────────────
 REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-    # Keep Token+Session for now (you can switch to JWT later)
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.TokenAuthentication",
         "rest_framework.authentication.SessionAuthentication",
@@ -123,7 +126,7 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.UserRateThrottle",
     ],
-    "DEFAULT_THROTTLE_RATES": {"user": "2000/day"},
+    "DEFAULT_THROTTLE_RATES": {"user": env("USER_THROTTLE_RATE", default="2000/day")},
 }
 
 SPECTACULAR_SETTINGS = {
@@ -132,47 +135,61 @@ SPECTACULAR_SETTINGS = {
 }
 
 ACCOUNT_LOGIN_METHODS = {"username"}
-ACCOUNT_SIGNUP_FIELDS = ["username", "email", "password1", "password2"]
-ACCOUNT_AUTHENTICATION_METHOD = "username"
-ACCOUNT_USERNAME_REQUIRED = True
-ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_SIGNUP_FIELDS = ["username*", "email*", "password1*", "password2*"]
 
 REST_AUTH_REGISTER_SERIALIZERS = {
-    'REGISTER_SERIALIZER': 'core.serializers.CustomRegisterSerializer'
+    "REGISTER_SERIALIZER": "core.serializers.CustomRegisterSerializer"
 }
 
-
-
-
-# ── CORS / CSRF ───────────────────────────────────────────────────────────────
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
+CORS_ALLOWED_ORIGINS = csv_env(
+    "CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
+)
 CORS_ALLOW_CREDENTIALS = True
+CSRF_TRUSTED_ORIGINS = csv_env(
+    "CSRF_TRUSTED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
+)
 
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
-
-
-# ── Basic security (good defaults; prod will set DEBUG=False) ─────────────────
 SECURE_CONTENT_TYPE_NOSNIFF = True
-SECURE_BROWSER_XSS_FILTER = True
-SESSION_COOKIE_SECURE = not DEBUG
-CSRF_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_SECURE = env.bool("SESSION_COOKIE_SECURE", default=DJANGO_ENV == "production")
+CSRF_COOKIE_SECURE = env.bool("CSRF_COOKIE_SECURE", default=DJANGO_ENV == "production")
 SESSION_COOKIE_HTTPONLY = True
-CSRF_COOKIE_HTTPONLY = True
+# The CSRF token is not an authentication secret; browser clients must be able
+# to read it when using DRF's SessionAuthentication.
+CSRF_COOKIE_HTTPONLY = False
+SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT", default=DJANGO_ENV == "production")
+SECURE_HSTS_SECONDS = env.int(
+    "SECURE_HSTS_SECONDS", default=31536000 if DJANGO_ENV == "production" else 0
+)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = DJANGO_ENV == "production"
+SECURE_HSTS_PRELOAD = DJANGO_ENV == "production"
+X_FRAME_OPTIONS = "DENY"
 
-# HSTS settings (only enabled in production when DEBUG=False)
-if not DEBUG:
-    SECURE_HSTS_SECONDS = 31536000  # 1 year
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
-    SECURE_SSL_REDIRECT = True
+EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
 
-# X-Frame-Options
-X_FRAME_OPTIONS = 'DENY'
+ALLOW_DEMO_SEED = env.bool("ALLOW_DEMO_SEED", default=False)
+DEMO_USER_USERNAME = env("DEMO_USER_USERNAME", default="demo_traveler")
+DEMO_USER_EMAIL = env("DEMO_USER_EMAIL", default="demo.traveler@example.test")
+DEMO_USER_PASSWORD = env("DEMO_USER_PASSWORD", default="Trainline-Demo-2026!")
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "standard": {
+            "format": "{asctime} {levelname} {name}: {message}",
+            "style": "{",
+        }
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "standard",
+        }
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": env("DJANGO_LOG_LEVEL", default="INFO"),
+    },
+}
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
