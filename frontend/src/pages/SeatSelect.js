@@ -1,251 +1,28 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-
 import api, { describeApiError } from '../api';
 import StatusPanel, { LoadingState } from '../components/StatusPanel';
 
-function sortSeats(seats) {
-  return [...seats].sort((left, right) =>
-    left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' })
-  );
-}
-
+const seatSort = (left, right) => left.seat_number.localeCompare(right.seat_number, undefined, { numeric: true });
 export default function SeatSelect() {
-  const { ticketId } = useParams();
-  const [ticket, setTicket] = useState(null);
-  const [tripId, setTripId] = useState(null);
-  const [seats, setSeats] = useState([]);
-  const [selectedSeat, setSelectedSeat] = useState(null);
-  const [unavailableSeats, setUnavailableSeats] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState(null);
-  const [confirmedSeat, setConfirmedSeat] = useState(null);
-
-  useEffect(() => {
-    document.body.classList.add('bg-seatselect');
-    return () => document.body.classList.remove('bg-seatselect');
-  }, []);
-
-  const refreshAvailability = useCallback(async (currentTripId, keepMessage = false) => {
-    if (!currentTripId) return;
-    setRefreshing(true);
-    if (!keepMessage) setError(null);
-    try {
-      const response = await api.get('/seats/' + currentTripId + '/');
-      setSeats(sortSeats(response.data));
-    } catch (requestError) {
-      setError(describeApiError(requestError, 'Seat availability could not be refreshed.'));
-    } finally {
-      setRefreshing(false);
-    }
-  }, []);
-
-  const loadSeatContext = useCallback(async (signal) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const ticketResponse = await api.get('/tickets/' + ticketId + '/', { signal });
-      const loadedTicket = ticketResponse.data;
-      const currentTripId = loadedTicket.train_trip?.trip_id;
-      if (!currentTripId) {
-        setError({
-          title: 'Trip details are missing',
-          message: 'This ticket is not associated with a train service.',
-        });
-        return;
-      }
-
-      setTicket(loadedTicket);
-      setTripId(currentTripId);
-      if (loadedTicket.seat_num) {
-        setConfirmedSeat(loadedTicket.seat_num);
-        return;
-      }
-
-      const seatsResponse = await api.get('/seats/' + currentTripId + '/', { signal });
-      setSeats(sortSeats(seatsResponse.data));
-    } catch (requestError) {
-      if (requestError?.code !== 'ERR_CANCELED') {
-        setError(describeApiError(requestError, 'Seat selection could not be loaded.'));
-      }
-    } finally {
-      if (!signal?.aborted) setLoading(false);
-    }
-  }, [ticketId]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    loadSeatContext(controller.signal);
-    return () => controller.abort();
-  }, [loadSeatContext]);
-
-  const confirmSelection = async () => {
-    if (!selectedSeat || submitting) return;
-    setSubmitting(true);
-    setError(null);
-
-    try {
-      await api.post('/seats/' + tripId + '/', {
-        ticket_id: ticketId,
-        seat_num: selectedSeat,
-      });
-      setConfirmedSeat(selectedSeat);
-    } catch (requestError) {
-      if (requestError.response?.status === 409) {
-        const conflictedSeat = selectedSeat;
-        setUnavailableSeats((current) =>
-          current.includes(conflictedSeat) ? current : [...current, conflictedSeat]
-        );
-        setSeats((current) => current.filter((seat) => seat !== conflictedSeat));
-        setSelectedSeat(null);
-        setError({
-          kind: 'conflict',
-          title: 'That seat was just taken',
-          message:
-            'Another booking reserved ' +
-            conflictedSeat +
-            '. Availability has been refreshed; choose another seat.',
-        });
-        await refreshAvailability(tripId, true);
-      } else {
-        setError(describeApiError(requestError, 'The seat could not be reserved.'));
-      }
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  if (loading) return <LoadingState label="Loading guarded seat availability…" />;
-  if (!ticket && error) {
-    return (
-      <StatusPanel
-        title={error.title}
-        message={error.message}
-        actionLabel="Retry seat selection"
-        onAction={() => loadSeatContext()}
-      />
-    );
-  }
-
-  if (confirmedSeat) {
-    return (
-      <div className="page-stack seat-page">
-        <ol className="journey-steps" aria-label="Booking progress">
-          <li className="journey-steps__complete"><span>✓</span>Options</li>
-          <li className="journey-steps__complete"><span>✓</span>Demo payment</li>
-          <li className="journey-steps__current" aria-current="step"><span>3</span>Seat</li>
-        </ol>
-        <section className="surface completion-card">
-          <span className="completion-card__mark" aria-hidden="true">✓</span>
-          <p className="eyebrow">Seat confirmed</p>
-          <h1>{confirmedSeat}</h1>
-          <p>
-            This seat is assigned to ticket #{ticketId} through the guarded backend workflow.
-          </p>
-          <Link className="button button--accent" to="/">Return to dashboard</Link>
-        </section>
-      </div>
-    );
-  }
-
-  return (
-    <div className="page-stack seat-page">
-      <ol className="journey-steps" aria-label="Booking progress">
-        <li className="journey-steps__complete"><span>✓</span>Options</li>
-        <li className="journey-steps__complete"><span>✓</span>Demo payment</li>
-        <li className="journey-steps__current" aria-current="step"><span>3</span>Seat</li>
-      </ol>
-
-      <header className="page-heading surface surface--hero">
-        <p className="eyebrow">Ticket #{ticketId}</p>
-        <h1>Select an available seat</h1>
-        <p className="lede">
-          Availability comes from the API. Your final choice is assigned transactionally and may
-          conflict if another booking wins the seat first.
-        </p>
-      </header>
-
-      <div className="seat-layout">
-        <section className="surface seat-map" aria-labelledby="seat-map-heading">
-          <div className="section-intro section-intro--compact">
-            <div>
-              <p className="eyebrow">Live inventory</p>
-              <h2 id="seat-map-heading">Coach 1</h2>
-            </div>
-            <button
-              className="button button--quiet button--small"
-              onClick={() => refreshAvailability(tripId)}
-              disabled={refreshing || submitting}
-            >
-              {refreshing ? 'Refreshing…' : 'Refresh seats'}
-            </button>
-          </div>
-
-          <ul className="seat-legend" aria-label="Seat map legend">
-            <li><span className="seat-sample">1A</span>Available</li>
-            <li><span className="seat-sample seat-sample--selected">1A ✓</span>Selected</li>
-            <li><span className="seat-sample seat-sample--unavailable">1A ×</span>Unavailable</li>
-            <li><span className="seat-sample seat-sample--focus">1A</span>Keyboard focus</li>
-          </ul>
-
-          {error && <StatusPanel title={error.title} message={error.message} variant="warning" />}
-
-          {seats.length === 0 && unavailableSeats.length === 0 ? (
-            <div className="empty-state">
-              <h3>No seats are currently available</h3>
-              <p>Return to your dashboard or refresh once before trying again.</p>
-            </div>
-          ) : (
-            <div className="seat-grid" role="group" aria-label="Available seats">
-              {sortSeats([...seats, ...unavailableSeats]).map((seatNumber) => {
-                const unavailable = unavailableSeats.includes(seatNumber);
-                const selected = selectedSeat === seatNumber;
-                return (
-                  <button
-                    key={seatNumber}
-                    className={
-                      'seat-button' +
-                      (selected ? ' seat-button--selected' : '') +
-                      (unavailable ? ' seat-button--unavailable' : '')
-                    }
-                    onClick={() => !unavailable && setSelectedSeat(seatNumber)}
-                    disabled={unavailable || submitting}
-                    aria-pressed={selected}
-                    aria-label={
-                      unavailable
-                        ? 'Seat ' + seatNumber + ', unavailable'
-                        : 'Seat ' + seatNumber + (selected ? ', selected' : ', available')
-                    }
-                  >
-                    <span>{seatNumber}</span>
-                    <small>{unavailable ? 'Taken' : selected ? 'Selected ✓' : 'Available'}</small>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </section>
-
-        <aside className="surface seat-review" aria-labelledby="seat-review-heading">
-          <p className="eyebrow">Selection</p>
-          <h2 id="seat-review-heading">{selectedSeat ? 'Seat ' + selectedSeat : 'Choose a seat'}</h2>
-          <p>
-            {selectedSeat
-              ? 'Confirm once. The app will never retry this reservation mutation automatically.'
-              : 'Select one available seat from the keyboard-operable grid.'}
-          </p>
-          <button
-            className="button button--accent button--large button--full"
-            onClick={confirmSelection}
-            disabled={!selectedSeat || submitting}
-          >
-            {submitting ? 'Reserving seat…' : 'Confirm seat'}
-          </button>
-          <Link className="text-link" to="/">Return to dashboard</Link>
-        </aside>
-      </div>
-    </div>
-  );
+  const { ticketId } = useParams(); const [ticket, setTicket] = useState(null); const [tripId, setTripId] = useState(null);
+  const [seats, setSeats] = useState([]); const [selectedSeat, setSelectedSeat] = useState(null);
+  const [loading, setLoading] = useState(true); const [refreshing, setRefreshing] = useState(false); const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null); const [confirmed, setConfirmed] = useState(null);
+  useEffect(() => { document.body.classList.add('bg-seatselect'); return () => document.body.classList.remove('bg-seatselect'); }, []);
+  const refresh = useCallback(async (currentTripId, keepMessage = false) => { if (!currentTripId) return; setRefreshing(true); if (!keepMessage) setError(null); try { setSeats((await api.get('/seats/' + currentTripId + '/')).data.sort(seatSort)); } catch (requestError) { setError(describeApiError(requestError, 'Seat availability could not be refreshed.')); } finally { setRefreshing(false); } }, []);
+  const load = useCallback(async (signal) => { setLoading(true); setError(null); try { const loaded = (await api.get('/tickets/' + ticketId + '/', { signal })).data; const currentTripId = loaded.train_trip?.trip_id; setTicket(loaded); setTripId(currentTripId); if (!currentTripId) { setError({ title: 'Trip details are missing', message: 'This booking is not connected to a train service.' }); return; } if (loaded.seat_num) { const inventory = (await api.get('/seats/' + currentTripId + '/', { signal })).data; const seat = inventory.find((item) => item.seat_number === loaded.seat_num); setConfirmed({ seat_num: loaded.seat_num, travel_class: seat?.travel_class || 'standard' }); setSeats(inventory.sort(seatSort)); return; } setSeats((await api.get('/seats/' + currentTripId + '/', { signal })).data.sort(seatSort)); } catch (requestError) { if (requestError?.code !== 'ERR_CANCELED') setError(describeApiError(requestError, 'Seat selection could not be loaded.')); } finally { if (!signal?.aborted) setLoading(false); } }, [ticketId]);
+  useEffect(() => { const controller = new AbortController(); load(controller.signal); return () => controller.abort(); }, [load]);
+  const rows = useMemo(() => seats.reduce((grouped, seat) => { const row = seat.seat_number.match(/^\d+/)?.[0] || '?'; (grouped[row] ||= []).push(seat); return grouped; }, {}), [seats]);
+  const choose = async () => { if (!selectedSeat || submitting) return; setSubmitting(true); setError(null); try { const response = await api.post('/seats/' + tripId + '/', { ticket_id: ticketId, seat_num: selectedSeat.seat_number }); setConfirmed(response.data); if (response.data.first_class_bonus) sessionStorage.setItem('membershipReward', JSON.stringify({ points: 1, total: response.data.membership_points, seat: response.data.seat_num })); } catch (requestError) { if (requestError.response?.status === 409) { const lost = selectedSeat.seat_number; setSelectedSeat(null); setError({ title: 'That seat was just taken', message: `${lost} is no longer available. The full coach map has been refreshed so you can choose another seat.` }); await refresh(tripId, true); } else setError(describeApiError(requestError, 'The seat could not be reserved.')); } finally { setSubmitting(false); } };
+  if (loading) return <LoadingState label="Loading the coach map…" />;
+  if (!ticket) return <StatusPanel title={error?.title || 'Booking unavailable'} message={error?.message || 'Return to your dashboard and choose another booking.'} actionLabel="Retry" onAction={() => load()} />;
+  if (confirmed) return <div className="page-stack seat-page"><ol className="journey-steps" aria-label="Booking progress"><li className="journey-steps__complete"><span>✓</span>Options</li><li className="journey-steps__complete"><span>✓</span>Demo payment</li><li className="journey-steps__current" aria-current="step"><span>3</span>Seat</li></ol><section className={'surface completion-card' + (confirmed.first_class_bonus || confirmed.travel_class === 'first' ? ' completion-card--gold' : '')}><span className="completion-card__mark" aria-hidden="true">✓</span><p className="eyebrow">Seat confirmed</p><h1>Seat {confirmed.seat_num}</h1><p>{confirmed.travel_class === 'first' ? 'First class · Coach 1' : 'Standard class · Coach 1'}</p>{confirmed.first_class_bonus && <p className="reward-pop" role="status">+1 first-class bonus</p>}<Link className="button button--accent" to="/">Return to dashboard</Link></section></div>;
+  return <div className="page-stack seat-page"><ol className="journey-steps" aria-label="Booking progress"><li className="journey-steps__complete"><span>✓</span>Options</li><li className="journey-steps__complete"><span>✓</span>Demo payment</li><li className="journey-steps__current" aria-current="step"><span>3</span>Seat</li></ol>
+    <header className="page-heading surface surface--hero compact-hero"><p className="eyebrow">{ticket.booking_reference}</p><h1>Choose your seat</h1><p className="lede">Every configured seat stays in place. Occupied seats are shown but cannot be selected.</p></header>
+    <div className="seat-layout"><section className="surface seat-map" aria-labelledby="seat-map-heading"><div className="section-intro section-intro--compact"><div><p className="eyebrow">Coach inventory</p><h2 id="seat-map-heading">Coach 1</h2></div><button className="button button--quiet button--small" onClick={() => refresh(tripId)} disabled={refreshing || submitting}>{refreshing ? 'Refreshing…' : 'Refresh'}</button></div>
+      <ul className="seat-legend" aria-label="Seat map legend"><li><span className="seat-sample">2A</span>Available</li><li><span className="seat-sample seat-sample--first">1A</span>First class</li><li><span className="seat-sample seat-sample--selected">2A ✓</span>Selected</li><li><span className="seat-sample seat-sample--unavailable">2A ×</span>Occupied</li></ul>{error && <StatusPanel title={error.title} message={error.message} variant="warning" />}
+      <div className="coach-map" role="group" aria-label="Coach 1 seat map">{Object.entries(rows).map(([row, rowSeats]) => <div className={'coach-row' + (row === '1' ? ' coach-row--first' : '')} key={row}><span className="coach-row__label">Row {row}{row === '1' && <small>First class</small>}</span><div className="coach-row__seats">{rowSeats.sort(seatSort).map((seat, index) => <button key={seat.seat_number} className={'seat-button' + (seat.travel_class === 'first' ? ' seat-button--first' : '') + (selectedSeat?.seat_number === seat.seat_number ? ' seat-button--selected' : '') + (!seat.available ? ' seat-button--unavailable' : '') + (index === 2 ? ' seat-button--aisle' : '')} onClick={() => seat.available && setSelectedSeat(seat)} disabled={!seat.available || submitting} aria-pressed={selectedSeat?.seat_number === seat.seat_number} aria-label={`Seat ${seat.seat_number}, ${seat.travel_class === 'first' ? 'first class, ' : ''}${seat.available ? 'available' : 'occupied'}`}><span>{seat.seat_number}</span><small>{seat.available ? seat.travel_class === 'first' ? 'First class' : 'Available' : 'Occupied'}</small></button>)}</div></div>)}</div>
+    </section><aside className="surface seat-review" aria-labelledby="seat-review-heading"><p className="eyebrow">Your selection</p><h2 id="seat-review-heading">{selectedSeat ? `Seat ${selectedSeat.seat_number}` : 'Choose a seat'}</h2><p>{selectedSeat ? `${selectedSeat.travel_class === 'first' ? 'First' : 'Standard'} class · Coach ${selectedSeat.car_number}` : 'Select any available seat from the coach map.'}</p>{selectedSeat?.travel_class === 'first' && <p className="first-class-note">A paid booking with a confirmed first-class seat earns 1 bonus point.</p>}<button className="button button--accent button--large button--full" onClick={choose} disabled={!selectedSeat || submitting}>{submitting ? 'Confirming…' : 'Confirm seat'}</button><Link className="text-link" to="/">Return to dashboard</Link></aside></div>
+  </div>;
 }

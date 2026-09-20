@@ -1,6 +1,6 @@
 # Trainline frontend
 
-The frontend is a React 18 single-page application using React Router 6 and Axios. It provides account entry, trip discovery, booking options, server-backed seat selection, ticket payment state, notifications, a client-only booking guide, and a public Engineering page. It deliberately does not claim live chat or monetary processing.
+The frontend is a React 18 single-page application using React Router 6 and Axios. It provides account entry, traveler-oriented trip discovery, server-quoted booking options, demo payment state, full server-backed seat inventory, membership progress, structured account updates, and a public Engineering page. It deliberately does not claim live timetable data, live chat, or monetary processing.
 
 ## Configuration
 
@@ -16,7 +16,7 @@ The development UI runs at <http://localhost:3000>.
 
 ## Validation
 
-The suite currently contains 22 behavior tests across seven files. It covers protected navigation, form validation and submission guards, async failure states, server-authoritative booking/payment presentation, and seat-conflict recovery.
+The suite covers protected navigation, form validation and submission guards, async failure states, server-authoritative quote/payment presentation, stable seat maps and conflict recovery, membership rewards, and structured-update focus/read behavior.
 
 ~~~powershell
 npm run lint

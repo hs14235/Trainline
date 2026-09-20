@@ -36,7 +36,7 @@ test('shows a loading state and then accessible trip details', async () => {
   );
 
   renderFlights();
-  expect(screen.getByRole('status')).toHaveTextContent('Checking the current timetable');
+  expect(screen.getByRole('status')).toHaveTextContent('Searching the timetable');
 
   resolveRequest({
     data: [
@@ -50,19 +50,19 @@ test('shows a loading state and then accessible trip details', async () => {
     ],
   });
 
-  expect(await screen.findByRole('heading', { name: 'London St Pancras' })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Review trip' })).toBeEnabled();
+  expect(await screen.findByRole('heading', { name: /London St Pancras.*Paris Gare du Nord/ })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'View trip' })).toBeEnabled();
   expect(screen.getByText('1 found')).toBeInTheDocument();
 });
 
 test('submits only API-supported filters', async () => {
   api.get.mockResolvedValue({ data: [] });
   renderFlights();
-  await screen.findByRole('heading', { name: 'No matching trains' });
+  await screen.findByRole('heading', { name: 'No trains match this search' });
 
-  await userEvent.type(screen.getByLabelText('Origin station'), 'London');
-  await userEvent.type(screen.getByLabelText('Destination station'), 'Paris');
-  await userEvent.click(screen.getByRole('button', { name: 'Search trains' }));
+  await userEvent.type(screen.getByLabelText('From'), 'London');
+  await userEvent.type(screen.getByLabelText('To'), 'Paris');
+  await userEvent.click(screen.getByRole('button', { name: 'Search' }));
 
   expect(api.get).toHaveBeenLastCalledWith(
     '/train-trips/',
@@ -80,8 +80,8 @@ test('shows a useful empty state and clear-filter recovery', async () => {
   api.get.mockResolvedValue({ data: [] });
   renderFlights();
 
-  expect(await screen.findByRole('heading', { name: 'No matching trains' })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Clear filters' })).toBeEnabled();
+  expect(await screen.findByRole('heading', { name: 'No trains match this search' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Show all demo services' })).toBeEnabled();
 });
 
 test('distinguishes service unavailability and offers a read-only retry', async () => {
@@ -92,5 +92,5 @@ test('distinguishes service unavailability and offers a read-only retry', async 
   api.get.mockResolvedValue({ data: [] });
   await userEvent.click(screen.getByRole('button', { name: 'Retry search' }));
   expect(api.get).toHaveBeenCalledTimes(2);
-  expect(await screen.findByRole('heading', { name: 'No matching trains' })).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: 'No trains match this search' })).toBeInTheDocument();
 });

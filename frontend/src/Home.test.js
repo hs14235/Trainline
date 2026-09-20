@@ -12,7 +12,6 @@ jest.mock('./api', () => {
     ...actual,
     default: {
       get: jest.fn(),
-      patch: jest.fn(),
       delete: jest.fn(),
     },
   };
@@ -48,7 +47,6 @@ function renderHome() {
 beforeEach(() => {
   jest.clearAllMocks();
   api.get.mockReset();
-  api.patch.mockReset();
   api.delete.mockReset();
   window.localStorage.clear();
 });
@@ -60,9 +58,9 @@ test('keeps ticket data visible when the profile request fails independently', a
 
   renderHome();
 
-  expect(await screen.findByRole('heading', { name: 'Service 7001' })).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: /London St Pancras.*Paris Gare du Nord/ })).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Trainline is unavailable' })).toBeInTheDocument();
-  expect(screen.getByText(/tickets may still be available below/i)).toBeInTheDocument();
+  expect(screen.getByText(/journeys may still be available below/i)).toBeInTheDocument();
 });
 
 test('requires explicit confirmation before cancelling a ticket', async () => {
@@ -74,13 +72,15 @@ test('requires explicit confirmation before cancelling a ticket', async () => {
   api.delete.mockResolvedValueOnce({ status: 204 });
 
   renderHome();
-  await screen.findByRole('heading', { name: 'Service 7001' });
-  await userEvent.click(screen.getByRole('button', { name: 'Cancel ticket' }));
+  await screen.findByRole('heading', { name: /London St Pancras.*Paris Gare du Nord/ });
+  await userEvent.click(screen.getByRole('button', { name: 'Manage booking' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Cancel booking' }));
 
   expect(api.delete).not.toHaveBeenCalled();
   expect(screen.getByText(/releases its selected seat/i)).toBeInTheDocument();
-  await userEvent.click(screen.getByRole('button', { name: 'Yes, cancel ticket' }));
+  api.get.mockResolvedValueOnce({ data: { membership_level: 'Bronze', membership_points: 0 } });
+  await userEvent.click(screen.getByRole('button', { name: 'Yes, cancel booking' }));
 
   expect(api.delete).toHaveBeenCalledWith('/tickets/12/');
-  expect(await screen.findByRole('heading', { name: 'No tickets yet' })).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: 'No bookings yet' })).toBeInTheDocument();
 });

@@ -4,35 +4,37 @@ Trainline is a full-stack rail-booking portfolio application built with React, D
 
 This independent engineering project is not affiliated with the commercial Trainline service.
 
-> Verification status — September 11, 2026: the fast backend suite, PostgreSQL integration tier, frontend tests and build, dependency audits, demo seed, and three-service Docker Compose stack were exercised locally. The GitHub Actions workflow is present but has not been pushed or run remotely. This revision is not deployed.
+> Verification status — September 20, 2026: the fast backend suite with measured coverage, isolated PostgreSQL locking tier, frontend lint/tests/build, migration checks, and three-service Docker Compose stack were exercised locally. The GitHub Actions workflow has not been run for this uncommitted revision. This revision is not deployed.
 
 ## Engineering highlights
 
 - User-scoped ticket and notification queries protect against cross-account object access.
 - Seat assignment serializes reservations on a shared PostgreSQL trip row and has a conditional database uniqueness constraint on `(train_trip, seat_num)`.
-- The server calculates fares; callers cannot set passenger ownership, payment state, payment method, or price.
+- The server returns itemized quotes and calculates persisted fares; callers cannot set passenger ownership, payment state, payment method, or price.
+- Stable booking keys prevent duplicate ticket creation; event keys prevent duplicate durable notifications.
+- Membership totals are derived idempotently from paid priority service and confirmed first-class seats.
 - Payment transitions use an allowlist and reject repeated payment with `409 Conflict`.
 - Development, test, and production-oriented Django settings have distinct safety behavior.
 - Compose startup is ordered through PostgreSQL, API-readiness, and frontend health checks.
 - An opt-in, production-blocked command creates deterministic demo data without overwriting users.
-- The 54-test backend suite separates fast behavior tests from PostgreSQL locking tests.
+- The backend suite separates fast behavior tests from PostgreSQL locking tests.
 - The repository-specific `trainline-testing` Codex skill selects test tiers, audits weak tests, and refuses remote or destructive actions.
 
 ## Product capabilities
 
 - Account registration and token-backed login
 - Authenticated profile summary
-- Responsive trip discovery with origin/destination/status filtering, allowlisted ordering, and explicit loading, empty, and service-failure states
-- Booking with optional priority boarding, meal, accommodation, and taxi fees
-- Keyboard-operable, server-backed seat selection with ownership-checked assignment and `409 Conflict` recovery
+- Responsive trip discovery with From/To/date controls, station swapping, secondary supported-status filtering, allowlisted ordering, and explicit loading, empty, and service-failure states
+- Server-quoted booking options with an itemized base fare, option fees, `$0.00` deterministic demo taxes/fees, and total
+- Keyboard-operable full coach inventory with stable occupied seats, first-class labels, ownership-checked assignment, and `409 Conflict` recovery
 - Duplicate-seat prevention at service and database layers
 - Owned-ticket list, update, delete/cancel, and payment transition
-- User-scoped notifications and read-state updates
-- A clearly labeled client-only booking guide; chat records exist in the data model but no live support workflow is claimed
+- Derived membership levels and points for paid priority service and confirmed first-class seats
+- User-scoped structured booking, payment, seat, point, and level-up event snapshots with idempotent creation and read-state updates
 - A public Engineering page describing verified architecture, test tiers, and limitations
 - OpenAPI schema, Swagger UI, liveness, and database readiness
 
-Payment currently means an internal validation/state transition; it does not contact a processor or move money. Chat records are modeled and seeded, but this revision does not expose a backend chat API.
+Payment remains a local demo state transition; it does not contact a processor, collect financial details, or move money. Chat records remain in the legacy data model, but no chat or fake-assistant interface is exposed.
 
 ## Architecture
 
@@ -125,7 +127,7 @@ Seed natively after setting `ALLOW_DEMO_SEED=True` in `backend/.env`:
 .\.venv\Scripts\python.exe backend\manage.py seed_demo
 ~~~
 
-The command is idempotent, refuses `DJANGO_ENV=production`, refuses username/email collisions, never changes an existing password, and does not print the password. It creates three trips, 48 seats, three initial tickets, three notifications, two payment records, and two chat records. For a clean exercise, use a new disposable database; never reset a database containing needed data.
+The command is idempotent, refuses `DJANGO_ENV=production`, refuses username/email collisions, never changes an existing password, and does not print the password. It creates three trips, 48 seats, three initial tickets, three timetable notices, three derived membership/reward events, two payment records, and two chat records. For a clean exercise, use a new disposable database; never reset a database containing needed data.
 
 ## Native development
 
@@ -171,27 +173,27 @@ macOS, Linux, and WSL use the equivalent `.venv/bin/python` and `cp` commands. L
 
 ## Test strategy and measured results
 
-Measured locally on September 11, 2026:
+Measured locally on September 20, 2026:
 
 | Tier | Observable behavior | Result |
 | --- | --- | --- |
-| Fast backend | Models, serializers, auth, ownership, filtering, booking, payment validation, notifications, schema generation, seat errors, and seed safety | 52 passed, 2 PostgreSQL tests deselected |
-| PostgreSQL | Concurrent duplicate-seat arbitration and payment row locking with nullable membership | 2 passed, 52 deselected |
-| Frontend | Navigation and protected routes, authentication validation, async states, mutation guards, payment disclosure, notifications/readiness, and seat-conflict recovery | 22 passed |
-| Coverage | Fast backend suite with branch measurement | 94.57% total; 90% gate passed |
+| Fast backend | Models, serializers, auth, ownership, quotes, idempotent booking/events, payment, membership, schema, seats, and seed safety | 58 passed, 2 PostgreSQL tests deselected |
+| PostgreSQL | Concurrent duplicate-seat arbitration and nullable-relation-safe ticket/passenger locking | 2 passed, 58 deselected |
+| Frontend | Navigation, search, quotes, mutation guards, payment disclosure, stable seat maps, rewards, structured updates, and conflict recovery | 23 passed across 8 suites |
+| Coverage | Fast backend suite with branch measurement | 94.71% total; 90% gate passed |
 
 Important module coverage:
 
 | Module | Coverage |
 | --- | ---: |
-| `core/views.py` | 99% |
-| `core/services.py` | 93% |
-| `core/models.py` | 91% |
-| `core/serializers.py` | 88% |
-| `core/signals.py` | 81% |
+| `core/views.py` | 96% |
+| `core/services.py` | 94% |
+| `core/models.py` | 92% |
+| `core/serializers.py` | 91% |
+| `core/signals.py` | 92% |
 | `seed_demo.py` | 98% |
 
-`signals.py` and registration serializer branches are the next meaningful targets. The threshold is below the measured baseline so regressions fail without encouraging assertion-free tests.
+The threshold is below the measured baseline so regressions fail without encouraging assertion-free tests.
 
 ## Representative API
 
@@ -202,13 +204,14 @@ Product endpoints require authentication unless stated otherwise.
 | `POST /api/dj-rest-auth/registration/` | Register |
 | `POST /api/dj-rest-auth/login/` | Issue a token |
 | `GET /api/me/` | Current profile summary |
-| `GET /api/train-trips/` | List; filters `origin`, `destination`, `status`, `ordering` |
-| `POST /api/train-trips/{trip_id}/book/` | Create an owned ticket with server-calculated amount |
+| `GET /api/train-trips/` | List; filters `origin`, `destination`, `departure_date`, `status`, `ordering` |
+| `GET /api/train-trips/{trip_id}/quote/` | Return option catalog and authoritative itemized demo quote |
+| `POST /api/train-trips/{trip_id}/book/` | Idempotently create an owned ticket with server-calculated amount |
 | `GET /api/tickets/` | List only owned tickets |
 | `PATCH /api/tickets/{ticket_id}/` | Update permitted booking options |
 | `DELETE /api/tickets/{ticket_id}/` | Delete/cancel an owned ticket |
 | `POST /api/tickets/{ticket_id}/pay/` | Validate and record payment state |
-| `GET /api/seats/{trip_id}/` | Current availability |
+| `GET /api/seats/{trip_id}/` | Full configured coach inventory with class and availability |
 | `POST /api/seats/{trip_id}/` | Assign a seat to an owned ticket |
 | `GET /api/notifications/` | List only owned notifications |
 | `POST /api/notifications/{notification_id}/mark_read/` | Mark an owned notification read |
@@ -253,8 +256,8 @@ Local `.env` files are ignored. Production rejects the documented demo secret an
 - The frontend stores its DRF token in `localStorage`; same-origin XSS could steal it. Moving to HttpOnly cookies or short-lived access/refresh tokens requires an intentional auth-contract change.
 - A legacy `.env.production` file is already tracked by Git. It was not opened or changed during this work. Before committing, verify privately whether it contains any live credential, rotate any such credential, preserve any needed local copy, and remove the file from tracking; ignore rules cannot retroactively untrack it.
 - Create React App and its transitive development toolchain are aging. The production dependency audit reports two moderate React Router advisories. The open-redirect risk is limited by current hard-coded navigation targets, and the SSR advisory does not apply to this client-only build, but the packages remain unpatched.
-- Payment lacks a provider, webhook verification, ledger, refunds, and idempotency keys.
-- Chat has persistence/UI representation but no authenticated backend API.
+- Payment lacks a provider, provider idempotency key, webhook verification, ledger, and refunds. The current booking key only deduplicates local ticket creation.
+- Chat has legacy persistence but no authenticated backend API or frontend assistant.
 - Email delivery, queues, metrics, tracing, backups, TLS termination, and deployment are not implemented.
 - SQLite cannot prove PostgreSQL locking; the PostgreSQL tier is mandatory for booking-integrity changes.
 - Trip listing has filtering and ordering but no pagination.
@@ -266,7 +269,7 @@ Local `.env` files are ignored. Production rejects the documented demo secret an
 2. Design a cookie-based auth migration with CSRF tests and an explicit compatibility plan.
 3. Add pagination and query-count assertions for growing collections.
 4. Expose user-scoped chat only after defining participants and moderation.
-5. Add a mocked provider adapter, idempotency key, and verified webhook flow before describing payment as external processing.
+5. Add a mocked provider adapter, provider-scoped idempotency key, and verified webhook flow before describing payment as external processing.
 6. Run CI remotely only after review and explicit push authorization.
 
 ## Production-oriented configuration

@@ -1,5 +1,6 @@
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.shortcuts import get_object_or_404
+from django.utils.dateparse import parse_date
 from drf_spectacular.utils import extend_schema, inline_serializer
 from rest_framework import generics, permissions, serializers, status, viewsets
 from rest_framework.decorators import action
@@ -11,10 +12,16 @@ from rest_framework.views import APIView
 from .models import Notification, Passenger, Ticket, TrainTrip
 from .serializers import NotificationSerializer, TicketSerializer, TrainTripSerializer
 from .services import (
+    MEMBERSHIP_LEVELS,
+    OPTION_CATALOG,
     SeatAssignmentError,
     assign_ticket_seat,
-    available_seat_numbers,
     calculate_ticket_amount,
+    create_event_notification,
+    membership_level_for_points,
+    quote_for_options,
+    recalculate_membership,
+    seat_inventory,
 )
 
 
@@ -49,6 +56,7 @@ class TrainTripViewSet(viewsets.ReadOnlyModelViewSet):
         origin = self.request.query_params.get("origin")
         destination = self.request.query_params.get("destination")
         status_filter = self.request.query_params.get("status")
+        departure_date = self.request.query_params.get("departure_date")
         ordering = self.request.query_params.get("ordering", "departure_time")
 
         if origin:
@@ -57,6 +65,8 @@ class TrainTripViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(destination_station__icontains=destination.strip())
         if status_filter:
             queryset = queryset.filter(status__iexact=status_filter.strip())
+        if departure_date and parse_date(departure_date):
+            queryset = queryset.filter(departure_time__date=parse_date(departure_date))
 
         allowed_ordering = {
             "departure_time",
@@ -78,16 +88,43 @@ class TrainTripViewSet(viewsets.ReadOnlyModelViewSet):
             for field in ("priority_boarding", "meal", "accommodation", "taxi")
         }
 
+        booking_key = str(request.data.get("booking_key") or "").strip()[:64] or None
         with transaction.atomic():
             passenger = passenger_for_user(request.user)
-            ticket = Ticket(passenger=passenger, train_trip=trip, **amenity_values)
+            if booking_key:
+                existing = Ticket.objects.filter(
+                    passenger=passenger, booking_key=booking_key
+                ).first()
+                if existing:
+                    return Response(TicketSerializer(existing).data, status=status.HTTP_200_OK)
+            ticket = Ticket(
+                passenger=passenger, train_trip=trip, booking_key=booking_key, **amenity_values
+            )
             ticket.amount = calculate_ticket_amount(ticket)
-            ticket.save()
+            try:
+                with transaction.atomic():
+                    ticket.save()
+            except IntegrityError:
+                if not booking_key:
+                    raise
+                ticket = Ticket.objects.get(passenger=passenger, booking_key=booking_key)
+                return Response(TicketSerializer(ticket).data, status=status.HTTP_200_OK)
+            recalculate_membership(passenger)
+            create_event_notification(
+                ticket=ticket,
+                event_key=f"booking:{ticket.pk}",
+                event_type="booking_created",
+                title="Booking created",
+                message="Your booking is ready for demo payment.",
+            )
 
-        return Response(
-            {"ticket_id": ticket.pk, "amount": float(ticket.amount)},
-            status=status.HTTP_201_CREATED,
-        )
+        return Response(TicketSerializer(ticket).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["get"], permission_classes=[IsAuthenticated])
+    def quote(self, request, pk=None):
+        self.get_object()
+        values = {field: parse_bool(request.query_params.get(field)) for field in OPTION_CATALOG}
+        return Response(quote_for_options(values))
 
 
 FlightViewSet = TrainTripViewSet
@@ -135,6 +172,8 @@ class TicketViewSet(viewsets.ModelViewSet):
 
                 if seat_was_supplied:
                     assign_ticket_seat(ticket=ticket, seat_number=seat_number)
+                else:
+                    recalculate_membership(ticket.passenger, event_ticket=ticket)
         except SeatAssignmentError as exc:
             response_status = (
                 status.HTTP_409_CONFLICT if exc.code == "conflict" else status.HTTP_400_BAD_REQUEST
@@ -173,9 +212,15 @@ class TicketViewSet(viewsets.ModelViewSet):
             ticket.paid = True
             ticket.payment_method = payment_method
             ticket.save(update_fields=["paid", "payment_method"])
-            ticket.passenger.refresh_from_db()
+            create_event_notification(
+                ticket=ticket,
+                event_key=f"payment:{ticket.pk}",
+                event_type="payment_confirmed",
+                title="Demo payment confirmed",
+                message="Your booking is paid and ready for seat selection.",
+            )
+            passenger = recalculate_membership(ticket.passenger, event_ticket=ticket)
 
-        passenger = ticket.passenger
         return Response(
             {
                 "status": "paid",
@@ -185,6 +230,7 @@ class TicketViewSet(viewsets.ModelViewSet):
                     if passenger.membership_level
                     else "Bronze"
                 ),
+                "ticket": TicketSerializer(ticket).data,
             }
         )
 
@@ -207,17 +253,36 @@ class MeView(APIView):
     )
     def get(self, request):
         passenger = getattr(request.user, "passenger", None)
+        points = passenger.membership_points if passenger else 0
+        current_name, current_threshold, _ = membership_level_for_points(points)
+        next_level = next(
+            (
+                {"level_name": name, "min_points_required": threshold}
+                for name, threshold, _ in MEMBERSHIP_LEVELS
+                if threshold > current_threshold
+            ),
+            None,
+        )
         return Response(
             {
                 "email": request.user.email,
                 "username": request.user.username,
                 "first_name": request.user.first_name,
                 "last_name": request.user.last_name,
-                "membership_points": passenger.membership_points if passenger else 0,
+                "membership_points": points,
                 "membership_level": (
                     passenger.membership_level.level_name
                     if passenger and passenger.membership_level
-                    else "Bronze"
+                    else current_name
+                ),
+                "membership_next_level": next_level,
+                "membership_levels": [
+                    {"level_name": name, "min_points_required": threshold}
+                    for name, threshold, _ in MEMBERSHIP_LEVELS
+                ],
+                "membership_earning_rule": (
+                    "Paid priority service earns 1 point. A confirmed first-class "
+                    "seat on a paid booking earns 1 additional point."
                 ),
             }
         )
@@ -228,10 +293,10 @@ class SeatListCreateView(generics.GenericAPIView):
 
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(responses=serializers.ListSerializer(child=serializers.CharField()))
+    @extend_schema(responses=serializers.ListSerializer(child=serializers.DictField()))
     def get(self, request, flight_id):
         trip = get_object_or_404(TrainTrip, pk=flight_id)
-        return Response(available_seat_numbers(trip))
+        return Response(seat_inventory(trip))
 
     @extend_schema(
         request=inline_serializer(
@@ -275,7 +340,24 @@ class SeatListCreateView(generics.GenericAPIView):
             )
             return Response({"seat_num": [str(exc)]}, status=response_status)
 
-        return Response({"status": "seat assigned", "seat_num": ticket.seat_num})
+        ticket.passenger.refresh_from_db()
+        selected = next(
+            (
+                seat
+                for seat in seat_inventory(ticket.train_trip)
+                if seat["seat_number"] == ticket.seat_num
+            ),
+            None,
+        )
+        return Response(
+            {
+                "status": "seat assigned",
+                "seat_num": ticket.seat_num,
+                "travel_class": selected["travel_class"] if selected else "standard",
+                "membership_points": ticket.passenger.membership_points,
+                "first_class_bonus": bool(selected and selected["travel_class"] == "first"),
+            }
+        )
 
 
 class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
@@ -284,7 +366,11 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return Notification.objects.filter(user=self.request.user).select_related("train_trip")
+        return (
+            Notification.objects.filter(user=self.request.user)
+            .select_related("train_trip")
+            .order_by("-sent_date", "-notification_id")
+        )
 
     @action(detail=True, methods=["post"])
     def mark_read(self, request, pk=None):

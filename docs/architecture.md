@@ -47,7 +47,7 @@ React owns browser interaction, client-side routes, loading/error state, and cal
 
 ### Django REST API
 
-The API owns authentication, authorization, validation, pricing, booking state, and database transaction boundaries. Views remain intentionally thin around `core/services.py` for fare calculation and seat assignment.
+The API owns authentication, authorization, validation, pricing, booking state, membership calculation, notification snapshots, and database transaction boundaries. Views remain intentionally thin around `core/services.py` for quotes, fare calculation, membership recomputation, event creation, and seat assignment.
 
 ### PostgreSQL
 
@@ -75,11 +75,12 @@ Token storage in `localStorage` is a known limitation: a successful same-origin 
 
 ### Booking and fare calculation
 
-1. The authenticated client posts booking options to `/api/train-trips/{trip_id}/book/`.
-2. The API resolves or creates the caller's one-to-one Passenger record.
-3. The server normalizes option booleans and calculates `base fare + selected fees`.
-4. Django creates the Ticket in an atomic transaction.
-5. The response returns only the new ticket identifier and calculated amount.
+1. The authenticated client requests `/api/train-trips/{trip_id}/quote/` as options change.
+2. The quote returns server-owned option names/prices, base fare, subtotal, `$0.00` demo taxes/fees, and total. Quote line items are recomputed rather than persisted.
+3. The client posts the options plus a stable booking key to `/api/train-trips/{trip_id}/book/`.
+4. The API resolves or creates the caller's one-to-one Passenger record and normalizes option booleans.
+5. Django creates the Ticket atomically; `(passenger, booking_key)` prevents duplicate submissions.
+6. The response serializes the created or previously created ticket with the same authoritative quote used by payment.
 
 The client never supplies passenger ownership or the authoritative amount.
 
@@ -104,7 +105,7 @@ sequenceDiagram
     end
 ~~~
 
-All application writes use the shared service, which locks the trip row so competing requests for the same trip are serialized. A partial PostgreSQL uniqueness constraint on `(train_trip, seat_num)` is the final integrity boundary for non-null, non-empty seat values. Migration `0003_ticket_unique_trip_seat` first refuses to apply if duplicates already exist; it does not silently rewrite historical data.
+The seat list returns every configured physical seat with coach, class, and availability; occupied seats do not disappear from the map. All assignment writes use the shared service, which locks the trip row so competing requests for the same trip are serialized. The ticket and passenger locks deliberately exclude nullable outer-joined relations because PostgreSQL rejects those `FOR UPDATE` queries. A partial PostgreSQL uniqueness constraint on `(train_trip, seat_num)` is the final integrity boundary for non-null, non-empty seat values. Migration `0003_ticket_unique_trip_seat` first refuses to apply if duplicates already exist; it does not silently rewrite historical data.
 
 ### Payment transition
 
@@ -112,7 +113,7 @@ All application writes use the shared service, which locks the trip row so compe
 2. The API locks the Ticket row without joining the nullable membership relation.
 3. An already-paid ticket returns `409 Conflict`.
 4. The paid flag and method are persisted atomically.
-5. The Ticket signal recalculates the Passenger's membership state.
+5. Membership is recomputed from persisted facts and structured payment/reward events are recorded idempotently.
 
 This is local state validation, not external payment processing. No live payment, email, or AI service is called.
 
@@ -128,6 +129,7 @@ erDiagram
     TRAIN_TRIP ||--o{ SEAT : provides
     USER ||--o{ NOTIFICATION : receives
     TRAIN_TRIP ||--o{ NOTIFICATION : concerns
+    TICKET ||--o{ NOTIFICATION : originates
     TICKET ||--o{ PAYMENT : records
     USER ||--o{ CHAT_MESSAGE : authors
     TICKET ||--o{ CHAT_MESSAGE : concerns
@@ -135,6 +137,8 @@ erDiagram
 ~~~
 
 The existing schema retains legacy database names such as `flight` and `flight_id` through Django's `db_table` and `db_column` mappings. These names are intentionally preserved to avoid an unnecessary data/API migration while the product language uses train trips.
+
+Membership uses one authoritative rule: a paid priority-service booking earns one point, and a confirmed first-class seat on a paid booking earns one additional point. Totals and Bronze/Silver/Gold/Platinum levels are derived from tickets and configured seats, never incremented blindly. Notification rows store event-time route, seat, points, and level snapshots so durable history does not change when current membership or a ticket later changes. `(user, event_key)` prevents duplicate event rows.
 
 ## Authorization boundaries
 
@@ -169,7 +173,7 @@ The tests cover anonymous, authenticated, owner, and non-owner requests, includi
 ### Needed later
 
 - Pagination and query budgets when trip/ticket volumes grow.
-- A provider boundary, idempotency key, ledger, and webhook verification for real payments.
+- A provider-specific idempotency key, ledger, and webhook verification for real payments. The current booking key prevents duplicate local ticket creation; it is not a payment-provider guarantee.
 - An authenticated chat API with explicit participant authorization.
 - Metrics, tracing, backup/restore exercises, and operational alerting before deployment.
 

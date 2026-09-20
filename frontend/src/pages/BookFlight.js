@@ -1,176 +1,49 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-
 import api, { describeApiError } from '../api';
 import StatusPanel, { LoadingState } from '../components/StatusPanel';
 
-const optionDefinitions = [
-  {
-    key: 'priority_boarding',
-    title: 'Sleeping coach',
-    description: 'Request the sleeping-coach option for this booking.',
-  },
-  {
-    key: 'meal',
-    title: 'Onboard meal',
-    description: 'Add the onboard meal option to the ticket.',
-  },
-  {
-    key: 'accommodation',
-    title: 'Accessible coach',
-    description: 'Request the supported accessible-coach accommodation.',
-  },
-  {
-    key: 'taxi',
-    title: 'Taxi on arrival',
-    description: 'Add the arrival taxi option recorded by this demo.',
-  },
-];
+const initialOptions = { priority_boarding: false, meal: false, accommodation: false, taxi: false };
+const currency = (value) => `$${Number(value || 0).toFixed(2)}`;
 
 export default function BookFlight() {
-  const { flightId } = useParams();
-  const navigate = useNavigate();
-  const [trip, setTrip] = useState(null);
-  const [options, setOptions] = useState({
-    priority_boarding: false,
-    meal: false,
-    accommodation: false,
-    taxi: false,
-  });
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    document.body.classList.add('bg-booking');
-    return () => document.body.classList.remove('bg-booking');
-  }, []);
-
-  const loadTrip = useCallback(async (signal) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await api.get('/train-trips/' + flightId + '/', { signal });
-      setTrip(response.data);
-    } catch (requestError) {
-      if (requestError?.code !== 'ERR_CANCELED') {
-        setError(describeApiError(requestError, 'Trip details could not be loaded.'));
-      }
-    } finally {
-      if (!signal?.aborted) setLoading(false);
-    }
+  const { flightId } = useParams(); const navigate = useNavigate();
+  const [trip, setTrip] = useState(null); const [options, setOptions] = useState(initialOptions);
+  const [quote, setQuote] = useState(null); const [loading, setLoading] = useState(true);
+  const [quoting, setQuoting] = useState(false); const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null); const bookingKey = useRef(window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`);
+  useEffect(() => { document.body.classList.add('bg-booking'); return () => document.body.classList.remove('bg-booking'); }, []);
+  const load = useCallback(async (signal) => {
+    setLoading(true); setError(null);
+    try { const [tripResponse, quoteResponse] = await Promise.all([api.get('/train-trips/' + flightId + '/', { signal }), api.get('/train-trips/' + flightId + '/quote/', { signal })]); setTrip(tripResponse.data); setQuote(quoteResponse.data); }
+    catch (requestError) { if (requestError?.code !== 'ERR_CANCELED') setError(describeApiError(requestError, 'This trip could not be loaded.')); }
+    finally { if (!signal?.aborted) setLoading(false); }
   }, [flightId]);
-
+  useEffect(() => { const controller = new AbortController(); load(controller.signal); return () => controller.abort(); }, [load]);
   useEffect(() => {
-    const controller = new AbortController();
-    loadTrip(controller.signal);
-    return () => controller.abort();
-  }, [loadTrip]);
-
-  const toggleOption = (key) => {
-    setOptions((current) => ({ ...current, [key]: !current[key] }));
+    if (!trip) return undefined;
+    const controller = new AbortController(); const timer = setTimeout(async () => {
+      setQuoting(true);
+      try { setQuote((await api.get('/train-trips/' + flightId + '/quote/', { params: options, signal: controller.signal })).data); }
+      catch (requestError) { if (requestError?.code !== 'ERR_CANCELED') setError(describeApiError(requestError, 'The updated quote could not be loaded.')); }
+      finally { if (!controller.signal.aborted) setQuoting(false); }
+    }, 120);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [flightId, options, trip]);
+  const submit = async () => {
+    if (submitting || quoting) return; setSubmitting(true); setError(null);
+    try { const response = await api.post('/train-trips/' + flightId + '/book/', { ...options, booking_key: bookingKey.current }); navigate('/payment/' + response.data.ticket_id); }
+    catch (requestError) { setError(describeApiError(requestError, 'Your booking could not be created.')); }
+    finally { setSubmitting(false); }
   };
-
-  const handleBook = async (event) => {
-    event.preventDefault();
-    if (submitting) return;
-
-    setSubmitting(true);
-    setError(null);
-    try {
-      const response = await api.post('/train-trips/' + flightId + '/book/', options);
-      navigate('/payment/' + response.data.ticket_id, {
-        state: { amount: response.data.amount, bookingCreated: true },
-      });
-    } catch (requestError) {
-      setError(describeApiError(requestError, 'The booking could not be created.'));
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  if (loading) return <LoadingState label="Loading trip details…" />;
-  if (!trip && error) {
-    return (
-      <StatusPanel
-        title={error.title}
-        message={error.message}
-        actionLabel="Retry trip"
-        onAction={() => loadTrip()}
-      />
-    );
-  }
-
-  return (
-    <div className="page-stack booking-page">
-      <ol className="journey-steps" aria-label="Booking progress">
-        <li className="journey-steps__current" aria-current="step"><span>1</span>Options</li>
-        <li><span>2</span>Demo payment</li>
-        <li><span>3</span>Seat</li>
-      </ol>
-
-      <header className="page-heading surface surface--hero">
-        <p className="eyebrow">Service {trip.service_number || '—'}</p>
-        <h1>{trip.origin_station} <span aria-hidden="true">→</span> {trip.destination_station}</h1>
-        <p className="lede">
-          Choose supported options, then let the API create the ticket and calculate its
-          authoritative amount.
-        </p>
-      </header>
-
-      <form className="booking-layout" onSubmit={handleBook}>
-        <section className="surface" aria-labelledby="options-heading">
-          <div className="section-intro section-intro--compact">
-            <div>
-              <p className="eyebrow">Step 1</p>
-              <h2 id="options-heading">Trip options</h2>
-            </div>
-          </div>
-          <div className="option-grid">
-            {optionDefinitions.map((option) => (
-              <label
-                className={'option-card' + (options[option.key] ? ' option-card--selected' : '')}
-                key={option.key}
-              >
-                <input
-                  type="checkbox"
-                  checked={options[option.key]}
-                  onChange={() => toggleOption(option.key)}
-                  disabled={submitting}
-                />
-                <span className="option-card__control" aria-hidden="true">✓</span>
-                <span>
-                  <strong>{option.title}</strong>
-                  <small>{option.description}</small>
-                </span>
-              </label>
-            ))}
-          </div>
-        </section>
-
-        <aside className="surface booking-review" aria-labelledby="review-heading">
-          <p className="eyebrow">Review</p>
-          <h2 id="review-heading">Create this booking</h2>
-          <dl>
-            <div><dt>Service</dt><dd>{trip.service_number || '—'}</dd></div>
-            <div><dt>Status</dt><dd>{trip.status || 'Not provided'}</dd></div>
-            <div><dt>Platform</dt><dd>{trip.platform || 'TBA'}</dd></div>
-            <div>
-              <dt>Options</dt>
-              <dd>{Object.values(options).filter(Boolean).length || 'None'}</dd>
-            </div>
-          </dl>
-          <div className="server-price-note">
-            <strong>Server-calculated total</strong>
-            <p>The final amount is returned after ticket creation. This page does not calculate it.</p>
-          </div>
-          {error && <StatusPanel title={error.title} message={error.message} variant="error" />}
-          <button className="button button--accent button--large button--full" type="submit" disabled={submitting}>
-            {submitting ? 'Creating booking…' : 'Create booking'}
-          </button>
-          <Link className="text-link" to="/flights">Back to train results</Link>
-        </aside>
-      </form>
-    </div>
-  );
+  if (loading) return <LoadingState label="Loading trip and fare…" />;
+  if (!trip) return <StatusPanel title={error?.title || 'Trip unavailable'} message={error?.message || 'Return to search and choose another train.'} actionLabel="Retry" onAction={() => load()} />;
+  const route = `${trip.origin_station || 'Origin unavailable'} → ${trip.destination_station || 'Destination unavailable'}`;
+  return <div className="page-stack booking-page">
+    <ol className="journey-steps" aria-label="Booking progress"><li className="journey-steps__current" aria-current="step"><span>1</span>Options</li><li><span>2</span>Demo payment</li><li><span>3</span>Seat</li></ol>
+    <header className="page-heading surface surface--hero compact-hero"><p className="eyebrow">Service {trip.service_number || '—'}</p><h1>{route}</h1><p className="lede">Choose any extras. The server recalculates every price before creating the booking.</p></header>
+    <div className="booking-layout"><section className="surface" aria-labelledby="options-heading"><div className="section-intro section-intro--compact"><div><p className="eyebrow">Customize your journey</p><h2 id="options-heading">Trip options</h2></div></div>
+      <div className="option-grid">{quote?.available_options?.map((option) => <label className={'option-card' + (options[option.key] ? ' option-card--selected' : '')} key={option.key}><input type="checkbox" checked={options[option.key]} onChange={(event) => setOptions((current) => ({ ...current, [option.key]: event.target.checked }))} /><span className="option-card__control" aria-hidden="true">✓</span><span className="option-card__copy"><strong>{option.name}</strong><small>{option.description}</small><b>+{currency(option.price)}</b></span></label>)}</div>
+    </section><aside className="surface booking-review" aria-labelledby="quote-heading"><p className="eyebrow">Estimated total</p><h2 id="quote-heading">Your fare</h2>{quoting ? <p role="status">Updating quote…</p> : <dl className="fare-breakdown"><div><dt>Base fare</dt><dd>{currency(quote?.base_fare)}</dd></div>{quote?.options?.map((item) => <div key={item.key}><dt>{item.name}</dt><dd>{currency(item.price)}</dd></div>)}<div><dt>Subtotal</dt><dd>{currency(quote?.subtotal)}</dd></div><div><dt>Taxes & fees</dt><dd>{currency(quote?.taxes_and_fees)}</dd></div><div className="fare-breakdown__total"><dt>Estimated total</dt><dd>{currency(quote?.total)}</dd></div></dl>}<p className="server-price-note">{quote?.tax_rule}</p>{error && <StatusPanel title={error.title} message={error.message} variant="error" />}<button className="button button--accent button--large button--full" type="button" onClick={submit} disabled={submitting || quoting}>{submitting ? 'Creating booking…' : 'Continue to demo payment'}</button><Link className="text-link" to="/flights">Back to search</Link></aside></div>
+  </div>;
 }
