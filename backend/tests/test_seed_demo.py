@@ -37,7 +37,7 @@ def test_seed_demo_is_idempotent(settings):
         "trips": 3,
         "seats": 48,
         "tickets": 3,
-        "notifications": 3,
+        "notifications": 6,
         "payments": 2,
         "chat_messages": 2,
     }

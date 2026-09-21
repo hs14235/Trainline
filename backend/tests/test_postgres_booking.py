@@ -17,8 +17,8 @@ def test_concurrent_seat_assignment_allows_only_one_winner():
         pytest.skip("PostgreSQL row-lock semantics are required")
 
     trip = TrainTripFactory()
-    first = TicketFactory(passenger=PassengerFactory(), train_trip=trip)
-    second = TicketFactory(passenger=PassengerFactory(), train_trip=trip)
+    first = TicketFactory(passenger=PassengerFactory(), train_trip=trip, paid=True)
+    second = TicketFactory(passenger=PassengerFactory(), train_trip=trip, paid=True)
     barrier = Barrier(2)
 
     def reserve(ticket_id):

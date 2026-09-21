@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 
 import './App.css';
-import ChatWidget from './components/ChatWidget';
 import NotificationWidget from './components/NotificationWidget';
 import ServiceStatus from './components/ServiceStatus';
 import Flights from './Flights';
@@ -20,12 +19,15 @@ function ProtectedRoute({ authenticated, children }) {
 
 function RouteFrame({ children }) {
   const location = useLocation();
+  const navigationType = useNavigationType();
   const mainRef = useRef(null);
 
   useEffect(() => {
-    window.scrollTo(0, 0);
-    mainRef.current?.focus({ preventScroll: true });
-  }, [location.pathname]);
+    if (navigationType !== 'POP') {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      mainRef.current?.focus({ preventScroll: true });
+    }
+  }, [location.pathname, navigationType]);
 
   return (
     <main id="main-content" className="app-main" ref={mainRef} tabIndex="-1">
@@ -134,7 +136,6 @@ export default function App() {
       </footer>
 
       {authenticated && <NotificationWidget />}
-      {authenticated && <ChatWidget />}
     </div>
   );
 }

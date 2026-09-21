@@ -53,8 +53,8 @@ export default function Login({ onAuthenticated }) {
         <p className="eyebrow">Continue your journey</p>
         <h1 id="login-heading">Sign in to Trainline</h1>
         <p>
-          Access your account-scoped tickets, server-backed seat availability, and demo payment
-          status.
+          Review your journeys, choose from server-backed seat availability, and continue the
+          clearly labeled demo payment workflow.
         </p>
         <ul className="auth-trust-list">
           <li>Bookings are authorized per account</li>
