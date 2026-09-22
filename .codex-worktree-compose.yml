@@ -1,0 +1,21 @@
+services:
+  db:
+    container_name: trainline-4d01-db
+    ports: !override
+      - "5434:5432"
+
+  backend:
+    container_name: trainline-4d01-backend
+    ports: !override
+      - "8100:8000"
+    environment:
+      CORS_ALLOWED_ORIGINS: http://localhost:3100,http://127.0.0.1:3100
+      CSRF_TRUSTED_ORIGINS: http://localhost:3100,http://127.0.0.1:3100
+
+  frontend:
+    container_name: trainline-4d01-frontend
+    build:
+      args:
+        REACT_APP_API_BASE: http://localhost:8100
+    ports: !override
+      - "3100:80"
