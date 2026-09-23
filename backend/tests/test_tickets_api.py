@@ -84,6 +84,22 @@ def test_payment_accepts_supported_methods(authenticated_client, passenger, paym
     assert ticket.payment_method == payment_method
 
 
+def test_payment_awards_priority_point_once_and_creates_durable_events(
+    authenticated_client, passenger
+):
+    ticket = TicketFactory(passenger=passenger, priority_boarding=True)
+    endpoint = f"/api/tickets/{ticket.pk}/pay/"
+    response = authenticated_client.post(endpoint, {"payment_method": "cash"}, format="json")
+    assert response.status_code == 200
+    passenger.refresh_from_db()
+    assert passenger.membership_points == 1
+    assert passenger.user.notification_set.filter(event_key=f"payment:{ticket.pk}").count() == 1
+    assert (
+        passenger.user.notification_set.filter(event_key=f"points:priority:{ticket.pk}").count()
+        == 1
+    )
+
+
 def test_payment_rejects_missing_and_unknown_methods(authenticated_client, passenger):
     ticket = TicketFactory(passenger=passenger)
 

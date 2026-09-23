@@ -59,7 +59,26 @@ def test_booking_calculates_amount_server_side(authenticated_client, user, trip)
     ticket = Ticket.objects.get(pk=response.data["ticket_id"])
     assert ticket.passenger.user == user
     assert ticket.amount == Decimal("280.00")
-    assert response.data["amount"] == 280.0
+    assert response.data["amount"] == "280.00"
+    assert response.data["quote"]["taxes_and_fees"] == "0.00"
+    assert response.data["quote"]["total"] == "280.00"
+
+
+def test_quote_and_booking_are_server_authoritative_and_idempotent(authenticated_client, trip):
+    quote = authenticated_client.get(
+        f"/api/train-trips/{trip.pk}/quote/", {"priority_boarding": "true", "meal": "true"}
+    )
+    assert quote.status_code == 200
+    assert quote.data["total"] == "180.00"
+    assert quote.data["tax_rule"].startswith("No taxes")
+
+    payload = {"priority_boarding": True, "booking_key": "stable-client-key"}
+    first = authenticated_client.post(f"/api/train-trips/{trip.pk}/book/", payload, format="json")
+    second = authenticated_client.post(f"/api/train-trips/{trip.pk}/book/", payload, format="json")
+    assert first.status_code == 201
+    assert second.status_code == 200
+    assert second.data["ticket_id"] == first.data["ticket_id"]
+    assert Ticket.objects.filter(booking_key="stable-client-key").count() == 1
 
 
 def test_booking_unknown_trip_returns_404(authenticated_client):

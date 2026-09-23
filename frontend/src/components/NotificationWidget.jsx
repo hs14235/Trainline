@@ -1,127 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-
 import api, { describeApiError } from '../api';
 
 export default function NotificationWidget() {
-  const [notes, setNotes] = useState([]);
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const panelRef = useRef(null);
-
-  const loadNotifications = useCallback(async (signal) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await api.get('/notifications/', { signal });
-      setNotes(response.data);
-    } catch (requestError) {
-      if (requestError?.code !== 'ERR_CANCELED') {
-        setError(describeApiError(requestError, 'Notifications could not be loaded.'));
-      }
-    } finally {
-      if (!signal?.aborted) setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    loadNotifications(controller.signal);
-    return () => controller.abort();
-  }, [loadNotifications]);
-
-  useEffect(() => {
-    if (open) panelRef.current?.focus();
-  }, [open]);
-
-  const markRead = async (notificationId) => {
-    const current = notes.find((note) => note.notification_id === notificationId);
-    if (!current || current.read_status === 'read') return;
-    try {
-      await api.post('/notifications/' + notificationId + '/mark_read/');
-      setNotes((items) =>
-        items.map((note) =>
-          note.notification_id === notificationId ? { ...note, read_status: 'read' } : note
-        )
-      );
-    } catch (requestError) {
-      setError(describeApiError(requestError, 'The notification could not be marked as read.'));
-    }
-  };
-
-  const unreadCount = notes.filter((note) => note.read_status !== 'read').length;
-
-  return (
-    <div className="utility-widget utility-widget--notifications">
-      {open && (
-        <section
-          id="notifications-panel"
-          className="utility-panel"
-          aria-labelledby="notifications-title"
-          ref={panelRef}
-          tabIndex="-1"
-        >
-          <div className="utility-panel__header">
-            <div>
-              <p className="eyebrow">Account updates</p>
-              <h2 id="notifications-title">Notifications</h2>
-            </div>
-            <button className="icon-button" onClick={() => setOpen(false)} aria-label="Close notifications">
-              ×
-            </button>
-          </div>
-          {loading ? (
-            <p role="status">Loading notifications…</p>
-          ) : error ? (
-            <div className="widget-error" role="alert">
-              <strong>{error.title}</strong>
-              <p>{error.message}</p>
-              {error.canRetry && (
-                <button className="button button--small" onClick={() => loadNotifications()}>
-                  Retry
-                </button>
-              )}
-            </div>
-          ) : notes.length === 0 ? (
-            <p className="widget-empty">No notifications for this account.</p>
-          ) : (
-            <ul className="notification-list">
-              {notes.map((note) => {
-                const unread = note.read_status !== 'read';
-                return (
-                  <li className={unread ? 'notification notification--unread' : 'notification'} key={note.notification_id}>
-                    <div>
-                      <span className="status-chip status-chip--compact">
-                        {unread ? 'Unread' : 'Read'}
-                      </span>
-                      <time dateTime={note.sent_date || undefined}>
-                        {note.sent_date ? new Date(note.sent_date).toLocaleString() : 'Date unavailable'}
-                      </time>
-                    </div>
-                    <p>{note.message}</p>
-                    {unread && (
-                      <button className="text-link" onClick={() => markRead(note.notification_id)}>
-                        Mark as read
-                      </button>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </section>
-      )}
-      <button
-        className="utility-trigger"
-        onClick={() => setOpen((current) => !current)}
-        aria-expanded={open}
-        aria-controls="notifications-panel"
-        aria-label={unreadCount > 0 ? `Updates, ${unreadCount} unread` : 'Updates'}
-      >
-        <span aria-hidden="true">⌁</span>
-        <span>Updates</span>
-        {unreadCount > 0 && <strong aria-hidden="true">{unreadCount}</strong>}
-      </button>
-    </div>
-  );
+  const [notes, setNotes] = useState([]); const [open, setOpen] = useState(false); const [loading, setLoading] = useState(true); const [error, setError] = useState(null);
+  const panelRef = useRef(null); const triggerRef = useRef(null); const wasOpenRef = useRef(false);
+  const load = useCallback(async (signal) => { setLoading(true); setError(null); try { setNotes((await api.get('/notifications/', { signal })).data); } catch (requestError) { if (requestError?.code !== 'ERR_CANCELED') setError(describeApiError(requestError, 'Updates could not be loaded.')); } finally { if (!signal?.aborted) setLoading(false); } }, []);
+  useEffect(() => { const controller = new AbortController(); load(controller.signal); return () => controller.abort(); }, [load]);
+  useEffect(() => { if (open) panelRef.current?.focus(); else if (wasOpenRef.current) triggerRef.current?.focus(); wasOpenRef.current = open; }, [open]);
+  const close = () => setOpen(false);
+  const markRead = async (id) => { const current = notes.find((note) => note.notification_id === id); if (!current || current.read_status === 'read') return; try { await api.post('/notifications/' + id + '/mark_read/'); setNotes((items) => items.map((note) => note.notification_id === id ? { ...note, read_status: 'read' } : note)); } catch (requestError) { setError(describeApiError(requestError, 'This update could not be marked as read.')); } };
+  const unread = notes.filter((note) => note.read_status !== 'read').length;
+  return <div className="utility-widget utility-widget--notifications">{open && <section id="notifications-panel" className="utility-panel" aria-labelledby="notifications-title" ref={panelRef} tabIndex="-1" onKeyDown={(event) => { if (event.key === 'Escape') close(); }}><div className="utility-panel__header"><div><p className="eyebrow">Your account</p><h2 id="notifications-title">Updates {unread > 0 && <span className="count-badge">{unread} unread</span>}</h2></div><button className="icon-button" onClick={close} aria-label="Close updates">×</button></div>
+    {loading ? <p role="status">Loading updates…</p> : error ? <div className="widget-error" role="alert"><strong>{error.title}</strong><p>{error.message}</p>{error.canRetry && <button className="button button--small" onClick={() => load()}>Retry</button>}</div> : notes.length === 0 ? <div className="widget-empty"><strong>You’re all caught up</strong><p>Booking, payment, seat, and reward updates will appear here.</p></div> : <ul className="notification-list">{notes.map((note) => { const isUnread = note.read_status !== 'read'; return <li className={'notification' + (isUnread ? ' notification--unread' : '') + (note.is_level_up ? ' notification--level-up' : '')} key={note.notification_id}><div><span className="status-chip status-chip--compact">{note.is_level_up ? 'Level up' : isUnread ? 'New' : 'Read'}</span><time dateTime={note.sent_date || undefined}>{note.sent_date ? new Date(note.sent_date).toLocaleString() : ''}</time></div><h3>{note.title || 'Update'}</h3><p>{note.message}</p><dl className="notification-facts">{note.booking_reference && <div><dt>Booking</dt><dd>{note.booking_reference}</dd></div>}{note.route_snapshot && <div><dt>Route</dt><dd>{note.route_snapshot}</dd></div>}{note.seat_snapshot && <div><dt>Seat</dt><dd>{note.seat_snapshot}</dd></div>}{note.points_delta > 0 && <div><dt>Points</dt><dd>+{note.points_delta}</dd></div>}{note.is_level_up && note.level_snapshot && <div><dt>Level</dt><dd>{note.level_snapshot}</dd></div>}</dl>{isUnread && <button className="text-link" onClick={() => markRead(note.notification_id)}>Mark as read</button>}</li>; })}</ul>}
+  </section>}<button ref={triggerRef} className={'utility-trigger' + (unread ? ' utility-trigger--new' : '')} onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-controls="notifications-panel" aria-label={unread ? `Updates, ${unread} unread` : 'Updates'}><span aria-hidden="true">⌁</span><span>Updates</span>{unread > 0 && <strong aria-hidden="true">{unread}</strong>}</button></div>;
 }

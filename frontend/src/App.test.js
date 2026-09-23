@@ -5,7 +5,6 @@ import App from './App';
 
 jest.mock('./components/ServiceStatus', () => () => <div>API and database ready</div>);
 jest.mock('./components/NotificationWidget', () => () => <button>Updates</button>);
-jest.mock('./components/ChatWidget', () => () => <button>Demo guide</button>);
 
 jest.mock('./api', () => ({
   __esModule: true,
@@ -85,5 +84,5 @@ test('authenticated navigation includes dashboard, trips, and logout', () => {
   expect(screen.getByRole('link', { name: 'Find trains' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Log out' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: /updates/i })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: /demo guide/i })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /demo guide/i })).not.toBeInTheDocument();
 });

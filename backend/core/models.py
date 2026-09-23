@@ -28,7 +28,7 @@ Flight = TrainTrip
 
 
 class MembershipLevel(models.Model):
-    level_name = models.CharField(max_length=8, blank=True, null=True)
+    level_name = models.CharField(max_length=8, blank=True, null=True, unique=True)
     min_points_required = models.IntegerField(blank=True, null=True)
     perks_description = models.CharField(max_length=50, blank=True, null=True)
 
@@ -89,6 +89,7 @@ class Ticket(models.Model):
     meal = models.BooleanField(default=False)
     accommodation = models.BooleanField(default=False)
     taxi = models.BooleanField(default=False)
+    booking_key = models.CharField(max_length=64, blank=True, null=True)
 
     class Meta:
         db_table = "ticket"
@@ -97,7 +98,12 @@ class Ticket(models.Model):
                 fields=["train_trip", "seat_num"],
                 condition=models.Q(seat_num__isnull=False) & ~models.Q(seat_num=""),
                 name="uniq_ticket_trip_seat",
-            )
+            ),
+            models.UniqueConstraint(
+                fields=["passenger", "booking_key"],
+                condition=models.Q(booking_key__isnull=False) & ~models.Q(booking_key=""),
+                name="uniq_ticket_passenger_booking_key",
+            ),
         ]
 
 
@@ -111,9 +117,28 @@ class Notification(models.Model):
     message = models.CharField(max_length=255)
     sent_date = models.DateTimeField(null=True, blank=True)
     read_status = models.CharField(max_length=6, null=True, blank=True)
+    event_key = models.CharField(max_length=100, blank=True, null=True)
+    event_type = models.CharField(max_length=24, blank=True, default="general")
+    ticket = models.ForeignKey(
+        Ticket, on_delete=models.SET_NULL, null=True, blank=True, related_name="notifications"
+    )
+    title = models.CharField(max_length=80, blank=True, default="Update")
+    booking_reference = models.CharField(max_length=24, blank=True, default="")
+    route_snapshot = models.CharField(max_length=120, blank=True, default="")
+    seat_snapshot = models.CharField(max_length=10, blank=True, default="")
+    points_delta = models.IntegerField(default=0)
+    level_snapshot = models.CharField(max_length=8, blank=True, default="")
+    is_level_up = models.BooleanField(default=False)
 
     class Meta:
         db_table = "notification"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "event_key"],
+                condition=models.Q(event_key__isnull=False) & ~models.Q(event_key=""),
+                name="uniq_notification_user_event",
+            )
+        ]
 
 
 class Payment(models.Model):

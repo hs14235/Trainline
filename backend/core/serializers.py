@@ -9,6 +9,7 @@ from .models import (
     Ticket,
     TrainTrip,
 )
+from .services import BASE_FARE, money, quote_for_ticket
 
 User = get_user_model()
 
@@ -54,6 +55,11 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class TrainTripSerializer(serializers.ModelSerializer):
+    base_fare = serializers.SerializerMethodField()
+
+    def get_base_fare(self, obj):
+        return money(BASE_FARE)
+
     class Meta:
         model = TrainTrip
         fields = [
@@ -66,6 +72,7 @@ class TrainTripSerializer(serializers.ModelSerializer):
             "status",
             "consist_type",
             "platform",
+            "base_fare",
         ]
 
 
@@ -75,6 +82,14 @@ FlightSerializer = TrainTripSerializer
 class TicketSerializer(serializers.ModelSerializer):
     train_trip = TrainTripSerializer(read_only=True)
     flight = TrainTripSerializer(source="train_trip", read_only=True)
+    quote = serializers.SerializerMethodField()
+    booking_reference = serializers.SerializerMethodField()
+
+    def get_quote(self, obj):
+        return quote_for_ticket(obj)
+
+    def get_booking_reference(self, obj):
+        return f"TL-{obj.ticket_id:06d}"
 
     class Meta:
         model = Ticket
@@ -92,6 +107,8 @@ class TicketSerializer(serializers.ModelSerializer):
             "booked_at",
             "paid",
             "payment_method",
+            "quote",
+            "booking_reference",
         ]
         read_only_fields = [
             "ticket_id",
@@ -138,5 +155,13 @@ class NotificationSerializer(serializers.ModelSerializer):
             "message",
             "sent_date",
             "read_status",
+            "event_type",
+            "title",
+            "booking_reference",
+            "route_snapshot",
+            "seat_snapshot",
+            "points_delta",
+            "level_snapshot",
+            "is_level_up",
         ]
         read_only_fields = ["notification_id", "sent_date"]
