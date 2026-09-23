@@ -1,0 +1,7 @@
+interface:
+  display_name: "Trainline Frontend UX"
+  short_description: "Inspect and refine the Trainline frontend UX"
+  default_prompt: "Use $trainline-frontend-ux to inspect this Trainline screen and suggest focused visual or UX improvements."
+
+policy:
+  allow_implicit_invocation: true
