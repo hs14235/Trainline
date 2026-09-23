@@ -84,3 +84,14 @@ test('requires explicit confirmation before cancelling a ticket', async () => {
   expect(api.delete).toHaveBeenCalledWith('/tickets/12/');
   expect(await screen.findByRole('heading', { name: 'No bookings yet' })).toBeInTheDocument();
 });
+
+test.each(['Silver', 'Gold', 'Platinum'])('renders the %s membership material without changing its accessible title', async (level) => {
+  api.get
+    .mockResolvedValueOnce({ data: { membership_level: level, membership_points: 6 } })
+    .mockResolvedValueOnce({ data: [] });
+
+  renderHome();
+
+  const heading = await screen.findByRole('heading', { name: `${level}, 6 points` });
+  expect(heading.closest('.membership-card')).toHaveClass(`membership-card--${level.toLowerCase()}`);
+});
