@@ -224,6 +224,7 @@ class TicketViewSet(viewsets.ModelViewSet):
         return Response(
             {
                 "status": "paid",
+                "payment_mode": "demo",
                 "membership_points": passenger.membership_points,
                 "membership_level": (
                     passenger.membership_level.level_name

@@ -24,6 +24,8 @@ SECRET_KEY = env("DJANGO_SECRET_KEY", default=DEVELOPMENT_SECRET_KEY)
 ALLOWED_HOSTS = csv_env("ALLOWED_HOSTS", "127.0.0.1,localhost")
 
 if DJANGO_ENV == "production":
+    if DEBUG:
+        raise ImproperlyConfigured("DJANGO_DEBUG must be False when DJANGO_ENV=production.")
     if not SECRET_KEY or SECRET_KEY == DEVELOPMENT_SECRET_KEY or SECRET_KEY.startswith("GENERATE-"):
         raise ImproperlyConfigured(
             "DJANGO_SECRET_KEY must contain a non-demo value when DJANGO_ENV=production."
@@ -166,7 +168,14 @@ X_FRAME_OPTIONS = "DENY"
 
 EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
 
+PAYMENT_MODE = env("PAYMENT_MODE", default="demo").strip().lower()
+if PAYMENT_MODE != "demo":
+    raise ImproperlyConfigured(
+        "Only PAYMENT_MODE=demo is implemented; no real payment provider is configured."
+    )
+
 ALLOW_DEMO_SEED = env.bool("ALLOW_DEMO_SEED", default=False)
+ALLOW_DEPLOYMENT_DEMO_SEED = env.bool("ALLOW_DEPLOYMENT_DEMO_SEED", default=False)
 DEMO_USER_USERNAME = env("DEMO_USER_USERNAME", default="demo_traveler")
 DEMO_USER_EMAIL = env("DEMO_USER_EMAIL", default="demo.traveler@example.test")
 DEMO_USER_PASSWORD = env("DEMO_USER_PASSWORD", default="Trainline-Demo-2026!")

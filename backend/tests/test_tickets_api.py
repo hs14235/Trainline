@@ -1,8 +1,11 @@
 from decimal import Decimal
 
 import pytest
+from core.models import Ticket
+from rest_framework.authtoken.models import Token
+from rest_framework.test import APIClient
 
-from .factories import PassengerFactory, TicketFactory, UserFactory
+from .factories import PassengerFactory, SeatFactory, TicketFactory, UserFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -28,6 +31,64 @@ def test_cross_user_ticket_retrieve_update_and_delete_return_404(authenticated_c
         == 404
     )
     assert authenticated_client.delete(f"/api/tickets/{other_ticket.pk}/").status_code == 404
+
+
+def test_token_authenticated_booking_workflow_enforces_owner_on_every_mutation():
+    owner = UserFactory()
+    owner_passenger = PassengerFactory(user=owner)
+    attacker = UserFactory()
+    PassengerFactory(user=attacker)
+    ticket = TicketFactory(passenger=owner_passenger, paid=False)
+    SeatFactory(train_trip=ticket.train_trip, seat_number="1A")
+
+    owner_client = APIClient()
+    owner_client.credentials(HTTP_AUTHORIZATION=f"Token {Token.objects.create(user=owner).key}")
+    attacker_client = APIClient()
+    attacker_client.credentials(
+        HTTP_AUTHORIZATION=f"Token {Token.objects.create(user=attacker).key}"
+    )
+    ticket_url = f"/api/tickets/{ticket.pk}/"
+
+    assert attacker_client.get("/api/tickets/").data == []
+    assert attacker_client.get(ticket_url).status_code == 404
+    assert attacker_client.patch(ticket_url, {"meal": True}, format="json").status_code == 404
+    assert attacker_client.put(ticket_url, {"meal": True}, format="json").status_code == 404
+    assert (
+        attacker_client.post(
+            f"{ticket_url}pay/", {"payment_method": "cash"}, format="json"
+        ).status_code
+        == 404
+    )
+    assert (
+        attacker_client.post(
+            f"/api/seats/{ticket.train_trip_id}/",
+            {"ticket_id": ticket.pk, "seat_num": "1A"},
+            format="json",
+        ).status_code
+        == 404
+    )
+    assert attacker_client.delete(ticket_url).status_code == 404
+
+    ticket.refresh_from_db()
+    assert ticket.paid is False
+    assert ticket.meal is False
+    assert ticket.seat_num is None
+
+    assert owner_client.get(ticket_url).status_code == 200
+    assert owner_client.patch(ticket_url, {"meal": True}, format="json").status_code == 200
+    payment = owner_client.post(f"{ticket_url}pay/", {"payment_method": "cash"}, format="json")
+    assert payment.status_code == 200
+    assert payment.data["payment_mode"] == "demo"
+    assert (
+        owner_client.post(
+            f"/api/seats/{ticket.train_trip_id}/",
+            {"ticket_id": ticket.pk, "seat_num": "1A"},
+            format="json",
+        ).status_code
+        == 200
+    )
+    assert owner_client.delete(ticket_url).status_code == 204
+    assert not Ticket.objects.filter(pk=ticket.pk).exists()
 
 
 def test_create_ignores_attacker_supplied_passenger(authenticated_client, passenger):
@@ -82,6 +143,7 @@ def test_payment_accepts_supported_methods(authenticated_client, passenger, paym
     ticket.refresh_from_db()
     assert ticket.paid is True
     assert ticket.payment_method == payment_method
+    assert response.data["payment_mode"] == "demo"
 
 
 def test_payment_awards_priority_point_once_and_creates_durable_events(

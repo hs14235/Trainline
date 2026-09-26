@@ -75,8 +75,85 @@ def test_seed_demo_requires_explicit_opt_in(settings):
 def test_seed_demo_refuses_production(settings):
     settings.DJANGO_ENV = "production"
     settings.ALLOW_DEMO_SEED = True
-    with pytest.raises(CommandError, match="production"):
+    settings.ALLOW_DEPLOYMENT_DEMO_SEED = False
+    with pytest.raises(CommandError, match="temporary-deployment-demo"):
         call_command("seed_demo")
+
+
+@pytest.mark.django_db
+def test_temporary_production_seed_requires_separate_deployment_opt_in(settings):
+    settings.DJANGO_ENV = "production"
+    settings.ALLOW_DEMO_SEED = True
+    settings.ALLOW_DEPLOYMENT_DEMO_SEED = False
+
+    with pytest.raises(CommandError, match="ALLOW_DEPLOYMENT_DEMO_SEED"):
+        call_command("seed_demo", temporary_deployment_demo=True)
+
+
+@pytest.mark.django_db
+def test_temporary_production_seed_requires_synthetic_email_domain(settings):
+    settings.DJANGO_ENV = "production"
+    settings.ALLOW_DEMO_SEED = True
+    settings.ALLOW_DEPLOYMENT_DEMO_SEED = True
+    settings.DEMO_USER_EMAIL = "demo@invalid.example.com"
+    settings.DEMO_USER_PASSWORD = "Separate-Temporary-Demo-Password-3817"
+
+    with pytest.raises(CommandError, match="synthetic .example.test"):
+        call_command("seed_demo", temporary_deployment_demo=True)
+
+
+@pytest.mark.django_db
+def test_seed_demo_allows_only_explicit_isolated_temporary_production_database(settings):
+    settings.DJANGO_ENV = "production"
+    settings.ALLOW_DEMO_SEED = True
+    settings.ALLOW_DEPLOYMENT_DEMO_SEED = True
+    settings.DEMO_USER_USERNAME = "temporary_render_demo"
+    settings.DEMO_USER_EMAIL = "temporary_render_demo@example.test"
+    settings.DEMO_USER_PASSWORD = "Separate-Temporary-Demo-Password-3817"
+
+    call_command("seed_demo", temporary_deployment_demo=True)
+    call_command("seed_demo", temporary_deployment_demo=True)
+
+    assert User.objects.filter(username="temporary_render_demo").count() == 1
+    assert TrainTrip.objects.count() == 3
+    assert Seat.objects.count() == 48
+    assert Ticket.objects.count() == 3
+    assert Payment.objects.count() == 2
+
+
+@pytest.mark.django_db
+def test_temporary_production_seed_refuses_unrelated_data_without_changes(settings):
+    settings.DJANGO_ENV = "production"
+    settings.ALLOW_DEMO_SEED = True
+    settings.ALLOW_DEPLOYMENT_DEMO_SEED = True
+    settings.DEMO_USER_USERNAME = "temporary_render_demo"
+    settings.DEMO_USER_EMAIL = "temporary_render_demo@example.test"
+    settings.DEMO_USER_PASSWORD = "Separate-Temporary-Demo-Password-3817"
+    unrelated = User.objects.create_user(
+        username="existing_user",
+        email="existing_user@example.test",
+        password="Unrelated-User-Password-3817",
+    )
+
+    with pytest.raises(CommandError, match="unrelated application data"):
+        call_command("seed_demo", temporary_deployment_demo=True)
+
+    assert User.objects.filter(pk=unrelated.pk).exists()
+    assert not User.objects.filter(username="temporary_render_demo").exists()
+    assert not TrainTrip.objects.exists()
+
+
+@pytest.mark.django_db
+def test_temporary_production_seed_rejects_development_demo_password(settings):
+    settings.DJANGO_ENV = "production"
+    settings.ALLOW_DEMO_SEED = True
+    settings.ALLOW_DEPLOYMENT_DEMO_SEED = True
+    settings.DEMO_USER_USERNAME = "temporary_render_demo"
+    settings.DEMO_USER_EMAIL = "temporary_render_demo@example.test"
+    settings.DEMO_USER_PASSWORD = "Trainline-Demo-2026!"
+
+    with pytest.raises(CommandError, match="separate DEMO_USER_PASSWORD"):
+        call_command("seed_demo", temporary_deployment_demo=True)
 
 
 @pytest.mark.django_db

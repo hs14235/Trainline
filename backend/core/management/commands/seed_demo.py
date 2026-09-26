@@ -13,19 +13,57 @@ from core.models import (
 from core.services import calculate_ticket_amount
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
-from django.db import transaction
+from django.db import models, transaction
+
+DEMO_TRIP_IDS = ("DEMO001", "DEMO002", "DEMO003")
+DEMO_PAYMENT_IDS = (9001, 9002)
+DEMO_CHAT_IDS = (9001, 9002)
+DEVELOPMENT_DEMO_PASSWORD = "Trainline-Demo-2026!"
 
 
 class Command(BaseCommand):
-    help = "Create idempotent, non-production Trainline demo data."
+    help = (
+        "Create idempotent Trainline demo data locally or, with explicit safeguards, "
+        "in a new disposable deployment database."
+    )
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--temporary-deployment-demo",
+            action="store_true",
+            help=(
+                "Allow an explicitly configured production deployment to seed only a new, "
+                "isolated synthetic demo database."
+            ),
+        )
 
     def handle(self, *args, **options):
-        if settings.DJANGO_ENV == "production":
-            raise CommandError("Demo seeding is disabled when DJANGO_ENV=production.")
         if not settings.ALLOW_DEMO_SEED:
             raise CommandError("Set ALLOW_DEMO_SEED=True to seed a local demo database.")
 
+        production_demo = settings.DJANGO_ENV == "production"
+        if production_demo:
+            if not options["temporary_deployment_demo"]:
+                raise CommandError("Production demo seeding requires --temporary-deployment-demo.")
+            if not settings.ALLOW_DEPLOYMENT_DEMO_SEED:
+                raise CommandError(
+                    "Set ALLOW_DEPLOYMENT_DEMO_SEED=True only for a new disposable demo database."
+                )
+            if settings.DEMO_USER_PASSWORD == DEVELOPMENT_DEMO_PASSWORD:
+                raise CommandError(
+                    "Production demo seeding requires a separate DEMO_USER_PASSWORD secret."
+                )
+            demo_email_domain = settings.DEMO_USER_EMAIL.casefold().rpartition("@")[2]
+            if not (
+                demo_email_domain == "example.test" or demo_email_domain.endswith(".example.test")
+            ):
+                raise CommandError(
+                    "Production demo seeding requires a synthetic .example.test email address."
+                )
+
         with transaction.atomic():
+            if production_demo:
+                self._assert_disposable_demo_scope()
             user = self._get_or_create_demo_user()
             passenger = self._get_or_create_passenger(user)
             trips = self._get_or_create_trips()
@@ -38,6 +76,35 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS("Demo data is ready."))
         self.stdout.write(f"Demo username: {user.username}")
         self.stdout.write("Password: value of DEMO_USER_PASSWORD (not printed)")
+
+    def _assert_disposable_demo_scope(self):
+        """Refuse to seed a deployment database containing unrelated application data."""
+        username = settings.DEMO_USER_USERNAME
+        unrelated_data = {
+            "users": User.objects.exclude(username=username).exists(),
+            "passengers": Passenger.objects.exclude(user__username=username).exists(),
+            "trips": TrainTrip.objects.exclude(pk__in=DEMO_TRIP_IDS).exists(),
+            "seats": Seat.objects.exclude(train_trip_id__in=DEMO_TRIP_IDS).exists(),
+            "tickets": Ticket.objects.exclude(passenger__user__username=username).exists(),
+            "notifications": Notification.objects.exclude(user__username=username).exists(),
+            "payments": Payment.objects.exclude(payment_id__in=DEMO_PAYMENT_IDS).exists()
+            or Payment.objects.filter(payment_id__in=DEMO_PAYMENT_IDS)
+            .filter(
+                models.Q(ticket__isnull=True)
+                | ~models.Q(ticket__passenger__user__username=username)
+            )
+            .exists(),
+            "chat messages": ChatMessage.objects.exclude(chat_id__in=DEMO_CHAT_IDS).exists()
+            or ChatMessage.objects.filter(chat_id__in=DEMO_CHAT_IDS)
+            .filter(models.Q(user__isnull=True) | ~models.Q(user__username=username))
+            .exists(),
+        }
+        conflicts = [name for name, exists in unrelated_data.items() if exists]
+        if conflicts:
+            raise CommandError(
+                "Refusing to seed a non-disposable database containing unrelated "
+                f"application data: {', '.join(conflicts)}. No data was changed."
+            )
 
     def _get_or_create_demo_user(self):
         username = settings.DEMO_USER_USERNAME
@@ -75,7 +142,7 @@ class Command(BaseCommand):
     def _get_or_create_trips(self):
         definitions = (
             (
-                "DEMO001",
+                DEMO_TRIP_IDS[0],
                 7001,
                 "London St Pancras",
                 "Paris Gare du Nord",
@@ -85,7 +152,7 @@ class Command(BaseCommand):
                 "5",
             ),
             (
-                "DEMO002",
+                DEMO_TRIP_IDS[1],
                 8420,
                 "Paris Gare de Lyon",
                 "Lyon Part-Dieu",
@@ -95,7 +162,7 @@ class Command(BaseCommand):
                 "A",
             ),
             (
-                "DEMO003",
+                DEMO_TRIP_IDS[2],
                 9304,
                 "Berlin Hbf",
                 "Amsterdam Centraal",

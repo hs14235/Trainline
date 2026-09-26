@@ -16,7 +16,7 @@ This independent engineering project is not affiliated with the commercial Train
 - Payment transitions use an allowlist and reject repeated payment with `409 Conflict`.
 - Development, test, and production-oriented Django settings have distinct safety behavior.
 - Compose startup is ordered through PostgreSQL, API-readiness, and frontend health checks.
-- An opt-in, production-blocked command creates deterministic demo data without overwriting users.
+- An opt-in command creates deterministic demo data without overwriting users; deployment use is additionally restricted to an explicitly enabled, otherwise-empty disposable database.
 - The backend suite separates fast behavior tests from PostgreSQL locking tests.
 - The repository-specific `trainline-testing` Codex skill selects test tiers, audits weak tests, and refuses remote or destructive actions.
 
@@ -127,7 +127,11 @@ Seed natively after setting `ALLOW_DEMO_SEED=True` in `backend/.env`:
 .\.venv\Scripts\python.exe backend\manage.py seed_demo
 ~~~
 
-The command is idempotent, refuses `DJANGO_ENV=production`, refuses username/email collisions, never changes an existing password, and does not print the password. It creates three trips, 48 seats, three initial tickets, three timetable notices, three derived membership/reward events, two payment records, and two chat records. For a clean exercise, use a new disposable database; never reset a database containing needed data.
+The command is idempotent, refuses username/email collisions, never changes an existing password, and does not print the password. It creates three trips, 48 seats, three initial tickets, three timetable notices, three derived membership/reward events, two payment records, and two chat records. For a clean exercise, use a new disposable database; never reset a database containing needed data.
+
+Production-mode seeding is fail-closed and intended only for a temporary portfolio deployment backed by a brand-new disposable database. It requires all of the following: `ALLOW_DEMO_SEED=True`, `ALLOW_DEPLOYMENT_DEMO_SEED=True`, the `--temporary-deployment-demo` flag, a synthetic `DEMO_USER_EMAIL` ending in `.example.test`, and a separate non-default `DEMO_USER_PASSWORD` supplied through the hosting platform's secret manager. Before writing anything, the command refuses to continue if it finds any user, passenger, trip, seat, ticket, notification, payment, or chat record outside the deterministic demo scope. It never deletes or resets records. Restore both seed flags to `False` immediately after the one-time seed.
+
+Payment remains simulated: `PAYMENT_MODE=demo` records only the application's demo payment state and never contacts a payment processor or accepts financial credentials. Any other payment mode is rejected at startup.
 
 ## Native development
 
@@ -173,14 +177,14 @@ macOS, Linux, and WSL use the equivalent `.venv/bin/python` and `cp` commands. L
 
 ## Test strategy and measured results
 
-Measured locally on September 20, 2026:
+Measured locally; backend, PostgreSQL, and coverage results were refreshed on September 25, 2026, while the frontend result remains from September 20, 2026:
 
 | Tier | Observable behavior | Result |
 | --- | --- | --- |
-| Fast backend | Models, serializers, auth, ownership, quotes, idempotent booking/events, payment, membership, schema, seats, and seed safety | 58 passed, 2 PostgreSQL tests deselected |
-| PostgreSQL | Concurrent duplicate-seat arbitration and nullable-relation-safe ticket/passenger locking | 2 passed, 58 deselected |
+| Fast backend | Models, serializers, auth, ownership, quotes, idempotent booking/events, payment, membership, production settings, schema, seats, and seed safety | 67 passed, 2 PostgreSQL tests deselected |
+| PostgreSQL | Concurrent duplicate-seat arbitration and nullable-relation-safe ticket/passenger locking | 2 passed, 67 deselected |
 | Frontend | Navigation, search, quotes, mutation guards, payment disclosure, stable seat maps, rewards, structured updates, and conflict recovery | 23 passed across 8 suites |
-| Coverage | Fast backend suite with branch measurement | 94.71% total; 90% gate passed |
+| Coverage | Fast backend suite with branch measurement | 94.96% total; 90% gate passed |
 
 Important module coverage:
 
@@ -191,7 +195,7 @@ Important module coverage:
 | `core/models.py` | 92% |
 | `core/serializers.py` | 91% |
 | `core/signals.py` | 92% |
-| `seed_demo.py` | 98% |
+| `seed_demo.py` | 99% |
 
 The threshold is below the measured baseline so regressions fail without encouraging assertion-free tests.
 

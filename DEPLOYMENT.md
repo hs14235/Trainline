@@ -9,6 +9,7 @@ Combining `docker-compose.yml` and `docker-compose.prod.yml`:
 - requires explicit PostgreSQL identity and password values;
 - requires a non-demo Django secret;
 - selects `booking.settings_production` and disables debug mode;
+- fails startup if production debug is enabled or if any payment mode other than the implemented simulated demo mode is requested;
 - runs Gunicorn instead of Django's development server;
 - removes the backend source bind mount;
 - removes the PostgreSQL host port;
@@ -81,6 +82,20 @@ Do not add `--volumes` unless deleting the exact environment's database is inten
 - Rollback ownership and incident-response contacts are defined.
 - Frontend `REACT_APP_API_BASE` is the exact deployed API origin.
 - Demo seeding remains disabled.
+
+## Temporary deployment demo data
+
+The seed command may be used for a short-lived portfolio deployment only when its PostgreSQL database is brand new, disposable, and contains no copied local, customer, or other real data. Do not point it at a shared, staging, or production database. The command is additive and idempotent; it has no reset or delete path.
+
+Keep `ALLOW_DEMO_SEED=False` and `ALLOW_DEPLOYMENT_DEMO_SEED=False` during normal runtime. For the one-time seed, temporarily provide both flags as `True` through the hosting platform, provide a unique synthetic username, an email ending in `.example.test`, and a separate demo-login password stored as a secret. Then run:
+
+~~~text
+python manage.py seed_demo --temporary-deployment-demo
+~~~
+
+The command checks the database before writing and aborts if it finds application records outside its deterministic demo scope. It also refuses the public local-development password. After a successful seed, restore both flags to `False`; the demo account remains usable without leaving seed access enabled. Never place the actual demo password in a repository file, command transcript, screenshot, or log.
+
+`PAYMENT_MODE=demo` is mandatory for this application revision. A successful payment request changes only simulated application state; there is no payment-provider integration and no financial information should be entered. The application rejects any unimplemented live payment mode during startup.
 
 ## Platform mapping
 
