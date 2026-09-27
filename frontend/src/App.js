@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 
 import './App.css';
+import api from './api';
 import NotificationWidget from './components/NotificationWidget';
 import ServiceStatus from './components/ServiceStatus';
 import Flights from './Flights';
@@ -47,10 +48,14 @@ export default function App() {
     setAuthenticated(true);
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    setAuthenticated(false);
-    navigate('/login');
+  const handleLogout = async () => {
+    try {
+      await api.post('/dj-rest-auth/logout/');
+    } finally {
+      localStorage.removeItem('token');
+      setAuthenticated(false);
+      navigate('/login');
+    }
   };
 
   const protect = (element) => (

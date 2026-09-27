@@ -1,4 +1,5 @@
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import environ
 from django.core.exceptions import ImproperlyConfigured
@@ -12,6 +13,23 @@ environ.Env.read_env(BASE_DIR / ".env")
 def csv_env(name, default=""):
     """Return a normalized comma-separated environment setting."""
     return [value.strip() for value in env(name, default=default).split(",") if value.strip()]
+
+
+def validate_exact_https_origins(name, origins):
+    """Reject wildcard, insecure, or path-bearing browser origins in production."""
+    for origin in origins:
+        parsed = urlsplit(origin)
+        if (
+            parsed.scheme != "https"
+            or not parsed.netloc
+            or parsed.path not in ("", "/")
+            or parsed.query
+            or parsed.fragment
+            or "*" in origin
+        ):
+            raise ImproperlyConfigured(
+                f"{name} must contain only exact HTTPS origins without paths or wildcards."
+            )
 
 
 DJANGO_ENV = env("DJANGO_ENV", default="development").strip().lower()
@@ -32,6 +50,13 @@ if DJANGO_ENV == "production":
         )
     if not ALLOWED_HOSTS:
         raise ImproperlyConfigured("ALLOWED_HOSTS must be set when DJANGO_ENV=production.")
+    if any(
+        "*" in host or host.startswith(".") or "://" in host or "/" in host
+        for host in ALLOWED_HOSTS
+    ):
+        raise ImproperlyConfigured(
+            "ALLOWED_HOSTS must contain only exact hostnames when DJANGO_ENV=production."
+        )
 
 SITE_ID = 1
 AUTH_USER_MODEL = "core.User"
@@ -146,10 +171,14 @@ REST_AUTH_REGISTER_SERIALIZERS = {
 CORS_ALLOWED_ORIGINS = csv_env(
     "CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
 )
-CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_CREDENTIALS = env.bool("CORS_ALLOW_CREDENTIALS", default=False)
 CSRF_TRUSTED_ORIGINS = csv_env(
     "CSRF_TRUSTED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
 )
+
+if DJANGO_ENV == "production":
+    validate_exact_https_origins("CORS_ALLOWED_ORIGINS", CORS_ALLOWED_ORIGINS)
+    validate_exact_https_origins("CSRF_TRUSTED_ORIGINS", CSRF_TRUSTED_ORIGINS)
 
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SESSION_COOKIE_SECURE = env.bool("SESSION_COOKIE_SECURE", default=DJANGO_ENV == "production")
@@ -158,7 +187,12 @@ SESSION_COOKIE_HTTPONLY = True
 # The CSRF token is not an authentication secret; browser clients must be able
 # to read it when using DRF's SessionAuthentication.
 CSRF_COOKIE_HTTPONLY = False
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SAMESITE = "Lax"
 SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT", default=DJANGO_ENV == "production")
+TRUST_X_FORWARDED_PROTO = env.bool("TRUST_X_FORWARDED_PROTO", default=False)
+if TRUST_X_FORWARDED_PROTO:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_HSTS_SECONDS = env.int(
     "SECURE_HSTS_SECONDS", default=31536000 if DJANGO_ENV == "production" else 0
 )

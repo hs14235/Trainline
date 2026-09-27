@@ -6,6 +6,8 @@ The frontend is a React 18 single-page application using React Router 6 and Axio
 
 Copy `.env.example` to the ignored `.env` file. `REACT_APP_API_BASE` must be the backend origin without a trailing `/api` because endpoint modules add `/api/...` themselves. `REACT_APP_BUILD_VERSION` is an optional public label for the Engineering page; it must never contain a secret.
 
+Omitting `REACT_APP_API_BASE` uses the browser's own origin and therefore requires the development server or deployment edge to proxy `/api`, `/healthz`, and `/readyz` to Django. Local development should copy the provided `.env.example`; a separate frontend/backend deployment must set the variable to the exact HTTPS backend origin. No localhost API endpoint is hardcoded into the application source.
+
 ~~~powershell
 Copy-Item .env.example .env
 npm ci

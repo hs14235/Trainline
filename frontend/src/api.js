@@ -1,9 +1,13 @@
 import axios from 'axios';
 
-export const API_ORIGIN = (process.env.REACT_APP_API_BASE || 'http://127.0.0.1:8000').replace(
-  /\/$/,
-  ''
-);
+export function resolveApiOrigin({ configuredOrigin, browserOrigin }) {
+  return (configuredOrigin || browserOrigin).replace(/\/$/, '');
+}
+
+export const API_ORIGIN = resolveApiOrigin({
+  configuredOrigin: process.env.REACT_APP_API_BASE,
+  browserOrigin: window.location.origin,
+});
 
 function getCookie(name) {
   const value = document.cookie

@@ -21,6 +21,17 @@ def test_login_returns_token(api_client, user):
     assert response.data["key"] == Token.objects.get(user=user).key
 
 
+def test_logout_revokes_token(api_client, user):
+    token = Token.objects.create(user=user)
+    api_client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+
+    response = api_client.post("/api/dj-rest-auth/logout/")
+
+    assert response.status_code == 200
+    assert not Token.objects.filter(pk=token.pk).exists()
+    assert api_client.get("/api/me/").status_code == 401
+
+
 def test_registration_creates_user(api_client):
     response = api_client.post(
         "/api/dj-rest-auth/registration/",

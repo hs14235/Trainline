@@ -18,7 +18,8 @@ from django.db import models, transaction
 DEMO_TRIP_IDS = ("DEMO001", "DEMO002", "DEMO003")
 DEMO_PAYMENT_IDS = (9001, 9002)
 DEMO_CHAT_IDS = (9001, 9002)
-DEVELOPMENT_DEMO_PASSWORD = "Trainline-Demo-2026!"
+# Public local sentinel documented in README; deployment-mode seeding rejects it.
+DEVELOPMENT_DEMO_PASSWORD = "Trainline-Demo-2026!"  # nosec B105
 
 
 class Command(BaseCommand):

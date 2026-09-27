@@ -35,6 +35,10 @@ The frontend and Django images should be replaceable and stateless. User uploads
 
 Supply values through the selected platform's secret or configuration system. The authoritative placeholder list is `.env.production.example`; required deployment concerns include `DJANGO_SECRET_KEY`, database connection variables, `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, and `REACT_APP_API_BASE`. `REACT_APP_BUILD_VERSION` is optional, public build metadata and must never contain a secret.
 
+The browser application currently authenticates with DRF tokens in the `Authorization` header. Cross-origin cookies are therefore disabled with `CORS_ALLOW_CREDENTIALS=False`; secure, HTTP-only, `SameSite=Lax` session cookies remain defense-in-depth for Django session consumers such as the same-origin admin. Tokens remain in browser `localStorage`, so preventing script injection remains a material security boundary. Logout calls the API to revoke the current token and then clears the browser copy even if the request fails.
+
+For separate frontend and backend services, set `REACT_APP_API_BASE` to the exact HTTPS backend origin, `ALLOWED_HOSTS` to the exact backend hostname, and both browser-origin lists to the exact HTTPS frontend origin. Do not add paths, wildcards, or HTTP production origins. For a same-origin deployment, omit `REACT_APP_API_BASE` so the production bundle uses `window.location.origin`, but the edge must then route `/api`, `/healthz`, and `/readyz` to Django; the repository Nginx image does not provide that API proxy itself.
+
 Do not copy a development `.env` file into an image. Build-time React variables are visible to every browser user and are configuration, not secret storage.
 
 ## Validate configuration locally
@@ -83,7 +87,17 @@ Do not add `--volumes` unless deleting the exact environment's database is inten
 - Frontend `REACT_APP_API_BASE` is the exact deployed API origin.
 - Demo seeding remains disabled.
 
+If and only if the selected platform terminates TLS and overwrites `X-Forwarded-Proto`, set `TRUST_X_FORWARDED_PROTO=True`. That enables Django's `SECURE_PROXY_SSL_HEADER` contract and prevents legitimate HTTPS requests from being redirected repeatedly. Leave it `False` when clients can supply that header directly or the proxy contract has not been verified.
+
 ## Temporary deployment demo data
+
+### Render Blueprint demo
+
+The repository-root `render.yaml` defines a disposable Render demo as three resources: a static React site, a single-instance Django web service, and a private Render PostgreSQL database. Automatic deploys are disabled so a Git push alone cannot change the hosted demo. Link the Blueprint to the branch containing the file, review all proposed resources, and provide a unique `DEMO_USER_PASSWORD` when Render prompts for the unsynchronized secret.
+
+The Blueprint enables `TRUST_X_FORWARDED_PROTO` only on the Render backend, where Render terminates public TLS and supplies the forwarded protocol. Its one-time initial deploy hook temporarily enables the two guarded seed flags for the seed command only; normal service runtime keeps both flags false. The deterministic service names are also the exact frontend and backend origins. If Render reports a name collision or proposes a suffix, stop and update `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, and `REACT_APP_API_BASE` together before deploying.
+
+This Blueprint intentionally uses free resources, synthetic data, a one-hour HSTS value, automatic startup migrations, and a single backend instance. Those are acceptable compromises for temporary traffic-flow testing, not proof of production readiness or durable data recovery.
 
 The seed command may be used for a short-lived portfolio deployment only when its PostgreSQL database is brand new, disposable, and contains no copied local, customer, or other real data. Do not point it at a shared, staging, or production database. The command is additive and idempotent; it has no reset or delete path.
 
@@ -109,6 +123,10 @@ Free and trial tiers commonly impose sleeping services, cold starts, CPU or memo
 - Build immutable frontend and backend images. Collect Django static assets during the image or release process, not into an ephemeral runtime directory that must survive restarts.
 - Terminate TLS at a trusted ingress or load balancer, preserve the original scheme, and validate secure-cookie and redirect behavior through that exact proxy chain.
 - Set CORS and CSRF allowlists to the exact deployed origins. Do not use wildcard origins with credentials.
+- Confirm the deployed frontend bundle calls the intended HTTPS API origin and contains no localhost API endpoint.
+- In a real browser, register or sign in with synthetic credentials, search, book, complete simulated payment, choose a seat, log out, log back in, and confirm the booking persists.
+- In a second synthetic account, confirm the first account's booking remains hidden and that an occupied seat returns a conflict without changing either booking.
+- Verify the public HTTP URL redirects once to HTTPS, HTTPS health and API requests do not loop, secure cookies are present where session authentication is used, and logout invalidates the previous API token.
 - Configure `/healthz` for process liveness and `/readyz` for database-aware readiness with conservative probe intervals and timeouts.
 - Send structured application and proxy logs to durable aggregation while excluding credentials, tokens, personal data, and payment payloads.
 - Define PostgreSQL backup frequency, retention, encryption, and a tested restore procedure before treating data as durable.

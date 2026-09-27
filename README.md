@@ -14,6 +14,7 @@ This independent engineering project is not affiliated with the commercial Train
 - Stable booking keys prevent duplicate ticket creation; event keys prevent duplicate durable notifications.
 - Membership totals are derived idempotently from paid priority service and confirmed first-class seats.
 - Payment transitions use an allowlist and reject repeated payment with `409 Conflict`.
+- Logout revokes the current API token before the browser clears its local authentication state.
 - Development, test, and production-oriented Django settings have distinct safety behavior.
 - Compose startup is ordered through PostgreSQL, API-readiness, and frontend health checks.
 - An opt-in command creates deterministic demo data without overwriting users; deployment use is additionally restricted to an explicitly enabled, otherwise-empty disposable database.
@@ -177,14 +178,15 @@ macOS, Linux, and WSL use the equivalent `.venv/bin/python` and `cp` commands. L
 
 ## Test strategy and measured results
 
-Measured locally; backend, PostgreSQL, and coverage results were refreshed on September 25, 2026, while the frontend result remains from September 20, 2026:
+Measured locally on September 26, 2026:
 
 | Tier | Observable behavior | Result |
 | --- | --- | --- |
-| Fast backend | Models, serializers, auth, ownership, quotes, idempotent booking/events, payment, membership, production settings, schema, seats, and seed safety | 67 passed, 2 PostgreSQL tests deselected |
-| PostgreSQL | Concurrent duplicate-seat arbitration and nullable-relation-safe ticket/passenger locking | 2 passed, 67 deselected |
-| Frontend | Navigation, search, quotes, mutation guards, payment disclosure, stable seat maps, rewards, structured updates, and conflict recovery | 23 passed across 8 suites |
+| Fast backend | Models, serializers, auth/logout, ownership, full booking journey, quotes, idempotent booking/events, payment, membership, production settings, schema, seats, and seed safety | 72 passed, 2 PostgreSQL tests deselected |
+| PostgreSQL | Concurrent duplicate-seat arbitration and nullable-relation-safe ticket/passenger locking | 2 passed, 72 deselected |
+| Frontend | Navigation, auth/logout, API-origin selection, search, quotes, mutation guards, payment disclosure, stable seat maps, rewards, structured updates, and conflict recovery | 26 passed across 9 suites |
 | Coverage | Fast backend suite with branch measurement | 94.96% total; 90% gate passed |
+| Local browser smoke | Isolated Compose/PostgreSQL registration, login, filtered search, server-priced booking, simulated payment, occupied/available seats, booking persistence, logout/relogin, and cross-user hiding | Passed at `localhost:3100`/`localhost:8100`; not evidence of a public deployment |
 
 Important module coverage:
 

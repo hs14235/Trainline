@@ -1,7 +1,9 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
 import App from './App';
+import api from './api';
 
 jest.mock('./components/ServiceStatus', () => () => <div>API and database ready</div>);
 jest.mock('./components/NotificationWidget', () => () => <button>Updates</button>);
@@ -20,6 +22,7 @@ jest.mock('./api', () => ({
 }));
 
 beforeEach(() => {
+  jest.clearAllMocks();
   window.localStorage.clear();
 });
 
@@ -85,4 +88,23 @@ test('authenticated navigation includes dashboard, trips, and logout', () => {
   expect(screen.getByRole('button', { name: 'Log out' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: /updates/i })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /demo guide/i })).not.toBeInTheDocument();
+});
+
+test('logout revokes the API token before clearing local authentication', async () => {
+  api.post.mockResolvedValueOnce({ data: { detail: 'Successfully logged out.' } });
+  window.localStorage.setItem('token', 'test-token');
+  render(
+    <MemoryRouter
+      initialEntries={['/engineering']}
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+    >
+      <App />
+    </MemoryRouter>
+  );
+
+  await userEvent.click(screen.getByRole('button', { name: 'Log out' }));
+
+  expect(api.post).toHaveBeenCalledWith('/dj-rest-auth/logout/');
+  expect(window.localStorage.getItem('token')).toBeNull();
+  expect(await screen.findByRole('heading', { name: /sign in to trainline/i })).toBeInTheDocument();
 });
