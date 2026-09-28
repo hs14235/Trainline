@@ -58,9 +58,9 @@ services:
       - key: DEMO_USER_PASSWORD
         sync: false
       - key: RUN_MIGRATIONS
-        value: "True"
+        value: "true"
       - key: COLLECT_STATIC
-        value: "True"
+        value: "true"
       - key: PORT
         value: "8000"
 
