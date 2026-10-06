@@ -1,6 +1,6 @@
 # Security model
 
-This document describes controls verified in the local repository as of September 11, 2026. It is not a penetration-test report, compliance attestation, or production-security certification.
+This document describes controls verified in the local repository as of October 3, 2026. It is not a penetration-test report, compliance attestation, or production-security certification.
 
 ## Trust boundaries
 
@@ -42,9 +42,10 @@ Scoped `404 Not Found` responses avoid confirming whether another user's object 
 - Example files contain only explicit demo values or placeholders.
 - Production settings reject the documented development secret.
 - Production Compose requires explicit database, origin, host, and API-base configuration.
-- Demo seeding requires opt-in and is blocked in production.
+- Demo seeding requires opt-in. Production-mode seeding additionally requires a separate deployment opt-in, an explicit command flag, synthetic identity values, and an otherwise-isolated disposable database.
 - The seed command does not print the demo password and will not overwrite an existing identity.
 - Logs use a standard console formatter and do not intentionally include credentials.
+- Current `main` and `revamp-trainline` do not track `.env.production`; it is ignored. The historical file removed in `8ef8ed7` contained only the public `REACT_APP_API_BASE` key when privately inspected.
 
 ### Browser and transport controls
 
@@ -53,7 +54,7 @@ Scoped `404 Not Found` responses avoid confirming whether another user's object 
 - CORS and CSRF trusted origins are explicit environment values.
 - The production Compose override removes PostgreSQL's host port and the backend source bind mount.
 
-These settings assume a correctly configured TLS proxy. That boundary has not been deployed or verified.
+These settings assume a correctly configured TLS proxy. A Render Blueprint exists, but no live TLS/proxy boundary or public deployment has been verified.
 
 ## Dependency audit
 

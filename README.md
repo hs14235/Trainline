@@ -4,7 +4,16 @@ Trainline is a full-stack rail-booking portfolio application built with React, D
 
 This independent engineering project is not affiliated with the commercial Trainline service.
 
-> Verification status — September 20, 2026: the fast backend suite with measured coverage, isolated PostgreSQL locking tier, frontend lint/tests/build, migration checks, and three-service Docker Compose stack were exercised locally. The GitHub Actions workflow has not been run for this uncommitted revision. This revision is not deployed.
+> Publication and verification status — October 3, 2026: public `main` is `ad2591d` and has a successful [GitHub Actions run](https://github.com/hs14235/Trainline/actions/runs/35893319473) for that exact commit. This checkout is public `revamp-trainline` at `1c17e66`; its backend, PostgreSQL, and frontend results below were rerun locally, but no GitHub-hosted run is claimed for this branch. A Render Blueprint is configured, but no live service or public URL has been verified.
+
+## Reviewer start here
+
+- **Run the product:** [Docker quick start](#docker-quick-start) and [demo account](#demo-environment)
+- **Understand the design:** [architecture overview](#architecture) and [detailed request/data flow](docs/architecture.md)
+- **Inspect engineering evidence:** [measured tests](#test-strategy-and-measured-results), [representative API](#representative-api), and [security model](SECURITY.md)
+- **See honest boundaries:** [known limitations](#known-limitations-and-tradeoffs) and [deployment status](DEPLOYMENT.md)
+- **Contribute safely:** [CONTRIBUTING.md](CONTRIBUTING.md)
+- **Understand branch publication:** [reviewable integration plan](docs/PUBLICATION_PLAN.md)
 
 ## Engineering highlights
 
@@ -64,7 +73,7 @@ The modular monolith has three runtime containers: React/Nginx, Django, and Post
 | Docker Compose | Builds, service startup ordering, and health checks |
 | pytest, pytest-django, Factory Boy, coverage.py | Behavior tests, fixtures, PostgreSQL tests, and coverage |
 | Black, isort, Flake8, ESLint | Formatting and static checks |
-| GitHub Actions | Local CI definition for backend and frontend verification |
+| GitHub Actions | Hosted verification on `main`; reusable backend/frontend workflow definition for reviewed branches and pull requests |
 
 ## Screenshots
 
@@ -178,15 +187,15 @@ macOS, Linux, and WSL use the equivalent `.venv/bin/python` and `cp` commands. L
 
 ## Test strategy and measured results
 
-Measured locally on September 26, 2026:
+The automated tiers below were rerun locally on October 3, 2026 against `revamp-trainline@1c17e66`. The browser smoke result is retained from its September 26, 2026 run and is labeled separately.
 
 | Tier | Observable behavior | Result |
 | --- | --- | --- |
-| Fast backend | Models, serializers, auth/logout, ownership, full booking journey, quotes, idempotent booking/events, payment, membership, production settings, schema, seats, and seed safety | 72 passed, 2 PostgreSQL tests deselected |
-| PostgreSQL | Concurrent duplicate-seat arbitration and nullable-relation-safe ticket/passenger locking | 2 passed, 72 deselected |
+| Fast backend | Models, serializers, auth/logout, ownership, full booking journey, quotes, idempotent booking/events, payment, membership, production settings, Render Blueprint schema, seats, and seed safety | 73 passed, 2 PostgreSQL tests deselected |
+| PostgreSQL | Concurrent duplicate-seat arbitration and nullable-relation-safe ticket/passenger locking | 2 passed, 73 deselected |
 | Frontend | Navigation, auth/logout, API-origin selection, search, quotes, mutation guards, payment disclosure, stable seat maps, rewards, structured updates, and conflict recovery | 26 passed across 9 suites |
 | Coverage | Fast backend suite with branch measurement | 94.96% total; 90% gate passed |
-| Local browser smoke | Isolated Compose/PostgreSQL registration, login, filtered search, server-priced booking, simulated payment, occupied/available seats, booking persistence, logout/relogin, and cross-user hiding | Passed at `localhost:3100`/`localhost:8100`; not evidence of a public deployment |
+| Local browser smoke | Isolated Compose/PostgreSQL registration, login, filtered search, server-priced booking, simulated payment, occupied/available seats, booking persistence, logout/relogin, and cross-user hiding | Passed September 26, 2026 at `localhost:3100`/`localhost:8100`; not rerun October 3 and not evidence of a public deployment |
 
 Important module coverage:
 
@@ -200,6 +209,8 @@ Important module coverage:
 | `seed_demo.py` | 99% |
 
 The threshold is below the measured baseline so regressions fail without encouraging assertion-free tests.
+
+These local results verify the revamp commit named above; they do not retroactively verify public `main`. Conversely, the successful hosted run verifies `main@ad2591d`, not the revamp-only Render and temporary-demo changes.
 
 ## Representative API
 
@@ -246,7 +257,7 @@ The schema is at `/api/schema/` and Swagger UI at `/api/docs/`.
 
 `.github/workflows/ci.yml` defines least-privilege jobs with concurrency cancellation, 15-minute timeouts, Python 3.12.9, Node.js 22.14.0, dependency caching, PostgreSQL 14, Django/migration checks, formatting, linting, dependency/security scans, coverage enforcement, integration tests, frontend tests, and a production build.
 
-The workflow is local and unpushed. There is intentionally no badge or claim that GitHub-hosted execution passes.
+GitHub-hosted run [35893319473](https://github.com/hs14235/Trainline/actions/runs/35893319473) completed successfully for the push of `main@ad2591d` on September 23, 2026. The workflow runs for pushes to `main` and for pull requests. No hosted run is claimed here for `revamp-trainline@1c17e66`; its results in this README are local unless explicitly labeled otherwise.
 
 ## Environment configuration
 
@@ -260,7 +271,7 @@ Local `.env` files are ignored. Production rejects the documented demo secret an
 ## Known limitations and tradeoffs
 
 - The frontend stores its DRF token in `localStorage`; same-origin XSS could steal it. Moving to HttpOnly cookies or short-lived access/refresh tokens requires an intentional auth-contract change.
-- A legacy `.env.production` file is already tracked by Git. It was not opened or changed during this work. Before committing, verify privately whether it contains any live credential, rotate any such credential, preserve any needed local copy, and remove the file from tracking; ignore rules cannot retroactively untrack it.
+- Neither current `main` nor current `revamp-trainline` tracks `.env.production`; `.gitignore` excludes it. A private history review found that the file removed in `8ef8ed7` contained only the public frontend configuration key `REACT_APP_API_BASE`, with no credential-named fields. The historical blob still exists in Git history, so this statement is deliberately narrower than claiming the file never existed.
 - Create React App and its transitive development toolchain are aging. The production dependency audit reports two moderate React Router advisories. The open-redirect risk is limited by current hard-coded navigation targets, and the SSR advisory does not apply to this client-only build, but the packages remain unpatched.
 - Payment lacks a provider, provider idempotency key, webhook verification, ledger, and refunds. The current booking key only deduplicates local ticket creation.
 - Chat has legacy persistence but no authenticated backend API or frontend assistant.
@@ -276,11 +287,15 @@ Local `.env` files are ignored. Production rejects the documented demo secret an
 3. Add pagination and query-count assertions for growing collections.
 4. Expose user-scoped chat only after defining participants and moderation.
 5. Add a mocked provider adapter, provider-scoped idempotency key, and verified webhook flow before describing payment as external processing.
-6. Run CI remotely only after review and explicit push authorization.
+6. Integrate the reviewed hardening onto current `main`, preserve its membership-card work, and run hosted CI through the authorized publication workflow in [docs/PUBLICATION_PLAN.md](docs/PUBLICATION_PLAN.md).
+
+## Contributing
+
+Use [CONTRIBUTING.md](CONTRIBUTING.md) for setup, focused test selection, security boundaries, and the evidence expected in a reviewable pull request. Do not treat a local test result from one branch as proof for another revision.
 
 ## Production-oriented configuration
 
-The production override is a baseline, not a deployment. Review [DEPLOYMENT.md](DEPLOYMENT.md), supply non-demo values, add TLS termination, backups, monitoring, and platform secrets, then validate in staging before release.
+The production override and `render.yaml` are deployment configurations, not evidence of a live deployment. Review [DEPLOYMENT.md](DEPLOYMENT.md), supply non-demo values through the target platform, and validate the real TLS/proxy, persistence, monitoring, and rollback boundaries before presenting a hosted demo as verified.
 
 ## License
 

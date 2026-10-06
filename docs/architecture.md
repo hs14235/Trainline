@@ -2,13 +2,13 @@
 
 ## Scope
 
-Trainline is a modular monolith deployed as three cooperating services:
+Trainline is a modular monolith designed to run as three cooperating services:
 
 1. An Nginx container serves the compiled React single-page application.
 2. A Django REST Framework process exposes authentication and domain APIs.
 3. PostgreSQL stores relational application state and provides the locking semantics used by seat assignment.
 
-The development container runs Django's reload-capable server. The production-oriented override replaces it with Gunicorn, removes the backend bind mount, closes the PostgreSQL host port, enables static collection, and selects `booking.settings_production`. It does not provide TLS termination, a cloud runtime, backups, or monitoring and is therefore not a complete deployment architecture.
+The development container runs Django's reload-capable server. The production-oriented override replaces it with Gunicorn, removes the backend bind mount, closes the PostgreSQL host port, enables static collection, and selects `booking.settings_production`. The repository also includes a Render Blueprint for a disposable demo. Neither configuration proves that a live TLS boundary, durable backup/restore path, monitoring, or rollback procedure has been deployed and verified.
 
 ## Service boundaries
 
