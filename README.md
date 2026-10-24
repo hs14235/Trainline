@@ -4,6 +4,8 @@ Trainline is a full-stack rail-booking portfolio application built with React, D
 
 This independent engineering project is not affiliated with the commercial Trainline service.
 
+![Searching London to Paris, opening the trip, and adding priority service and a meal while the server-calculated fare updates](backend/docs/trainline-search-and-options.gif)
+
 > Verification status — September 20, 2026: the fast backend suite with measured coverage, isolated PostgreSQL locking tier, frontend lint/tests/build, migration checks, and three-service Docker Compose stack were exercised locally. The GitHub Actions workflow has not been run for this uncommitted revision. This revision is not deployed.
 
 ## Engineering highlights
@@ -65,15 +67,32 @@ The modular monolith has three runtime containers: React/Nginx, Django, and Post
 | Black, isort, Flake8, ESLint | Formatting and static checks |
 | GitHub Actions | Local CI definition for backend and frontend verification |
 
-## Screenshots
+## Use cases
 
-These checked-in captures show the existing interface and historical sample records. The current seed uses deterministic trips dated in 2030.
+Recorded on October 24, 2026 from this branch's Docker Compose stack with the documented demo seed (`seed_demo`); payments are simulated.
+
+**Search and choose options** (the recording at the top). Find a service, open the trip, and add extras. The fare panel is recalculated by the API; the browser never sets prices.
+
+**Pay, then pick a seat.** The booking is paid through the clearly labelled demo payment step, then a seat is chosen from live coach inventory: occupied seats are unavailable, and the database decides any conflict.
+
+![Choosing a demo payment method, confirming payment, then selecting first-class seat 1B next to an occupied seat and confirming it](backend/docs/trainline-pay-and-seat.gif)
+
+**Rewards and updates.** A paid first-class seat earns a membership bonus point on the dashboard, and each booking step leaves an update the traveler can mark as read.
+
+![The dashboard showing a +1 bonus point reward and membership progress, then the updates drawer with an update marked as read](backend/docs/trainline-rewards-and-updates.gif)
+
+<details>
+<summary>Earlier screenshots</summary>
+
+These captures show the earlier interface and historical sample records.
 
 | Login | Registration |
 | --- | --- |
 | ![Login form over a steam-train photograph](backend/docs/traindemo-login.jpg) | ![Registration form over a railway photograph](backend/docs/traindemo-signup.jpg) |
 | Trip discovery | Payment selection |
 | ![Rail trips with route, schedule, platform, and booking actions](backend/docs/tripdemo-booking.jpg) | ![Ticket amount and payment-method selection](backend/docs/traindemopayment.jpg) |
+
+</details>
 
 ## Docker quick start
 
